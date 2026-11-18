@@ -3,12 +3,14 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -109,18 +111,25 @@ export default function MessagesPanel({ user, profile, onBack }) {
     try {
       const conversationId = conversationIdFor(user.uid, selectedPerson.uid);
       const conversationRef = doc(db, 'conversations', conversationId);
+      const existing = await getDoc(conversationRef);
       const participants = [user.uid, selectedPerson.uid].sort();
 
-      // Merge creates a new conversation or updates the existing one without
-      // requiring a read of a conversation that may not exist yet.
-      await setDoc(conversationRef, {
-        participants,
-        createdBy: user.uid,
-        lastMessage: text,
-        lastSenderId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      if (!existing.exists()) {
+        await setDoc(conversationRef, {
+          participants,
+          createdBy: user.uid,
+          lastMessage: text,
+          lastSenderId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await updateDoc(conversationRef, {
+          lastMessage: text,
+          lastSenderId: user.uid,
+          updatedAt: serverTimestamp()
+        });
+      }
 
       await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
         text,
