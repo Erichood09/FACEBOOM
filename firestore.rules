@@ -1,0 +1,164 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // A friendship may be created only in the same atomic operation
+    // that changes the corresponding request from pending to accepted.
+    // An old accepted request cannot authorize recreating a friendship.
+    function acceptedFriendPair(userId, friendUid) {
+      let pathA = /databases/$(database)/documents/friendRequests/$(friendUid + '_' + userId);
+      let pathB = /databases/$(database)/documents/friendRequests/$(userId + '_' + friendUid);
+
+      return (
+        exists(pathA) &&
+        get(pathA).data.status == 'pending' &&
+        existsAfter(pathA) &&
+        getAfter(pathA).data.status == 'accepted'
+      ) || (
+        exists(pathB) &&
+        get(pathB).data.status == 'pending' &&
+        existsAfter(pathB) &&
+        getAfter(pathB).data.status == 'accepted'
+      );
+    }
+
+    // PRIVATE USER PROFILES
+    match /users/{userId} {
+      allow read: if ownsUser(userId);
+
+      allow create: if ownsUser(userId)
+        && request.resource.data.accountStatus == 'active';
+
+      allow update: if ownsUser(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'fullName',
+            'username',
+            'country',
+            'photoURL',
+            'coverPhotoURL',
+            'bio',
+            'email',
+            'updatedAt'
+          ]);
+
+      allow delete: if false;
+
+      // FRIENDS SUBCOLLECTION
+      match /friends/{friendUid} {
+        allow read: if ownsUser(userId);
+
+        allow create, update: if signedIn()
+          && (request.auth.uid == userId || request.auth.uid == friendUid)
+          && request.resource.data.uid == friendUid
+          && acceptedFriendPair(userId, friendUid);
+
+        allow delete: if signedIn()
+          && (request.auth.uid == userId || request.auth.uid == friendUid);
+      }
+    }
+
+    // PUBLIC PROFILE DIRECTORY
+    match /publicProfiles/{userId} {
+      allow read: if signedIn();
+
+      allow create, update: if ownsUser(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'fullName',
+          'username',
+          'country',
+          'bio',
+          'photoURL',
+          'coverPhotoURL',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // POSTS
+    match /posts/{postId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid;
+
+      allow update: if false;
+
+      allow delete: if signedIn()
+        && resource.data.authorId == request.auth.uid;
+
+      // LIKES
+      match /likes/{likeId} {
+        allow read: if signedIn();
+
+        allow create: if signedIn()
+          && likeId == request.auth.uid
+          && request.resource.data.userId == request.auth.uid;
+
+        allow update: if false;
+
+        allow delete: if signedIn()
+          && (
+            likeId == request.auth.uid ||
+            resource.data.userId == request.auth.uid
+          );
+      }
+
+      // COMMENTS
+      match /comments/{commentId} {
+        allow read: if signedIn();
+
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000;
+
+        allow update: if false;
+
+        allow delete: if signedIn()
+          && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // FRIEND REQUESTS
+    match /friendRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          resource.data.fromUid == request.auth.uid ||
+          resource.data.toUid == request.auth.uid
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid is string
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'respondedAt']);
+
+      allow delete: if signedIn()
+        && (
+          resource.data.fromUid == request.auth.uid ||
+          resource.data.toUid == request.auth.uid
+        );
+    }
+  }
+}
