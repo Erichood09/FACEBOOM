@@ -63,7 +63,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
       setConversations(rows);
     }, (err) => {
       console.error('Load conversations:', err);
-      setError('Unable to load your inbox. Check your Firestore rules.');
+      setError(`Inbox error (${err.code || 'unknown'}): ${err.message || 'Unable to load your inbox.'}`);
     });
   }, [user.uid]);
 
