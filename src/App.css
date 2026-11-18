@@ -1,0 +1,315 @@
+
+/* FACEBOOM GLOBAL STYLES */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f0f2f5;
+  color: #1c1e21;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: #1877f2 !important;
+  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.12);
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* RESPONSIVE MOBILE DESIGN */
+
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+  }
+
+  header {
+    padding: 12px !important;
+  }
+
+  header h1 {
+    font-size: 24px;
+  }
+
+  main {
+    margin: 15px auto !important;
+    padding: 0 10px !important;
+  }
+
+  button {
+    max-width: 100%;
+  }
+
+  textarea,
+  input {
+    font-size: 16px !important;
+  }
+
+  video,
+  img {
+    max-width: 100%;
+  }
+}
+
+/* SCROLLBAR */
+
+::-webkit-scrollbar {
+  width: 7px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c5c5c5;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* FIND FRIENDS AND FRIEND REQUESTS */
+.fb-friends-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+}
+
+.fb-friends-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.fb-friends-heading h2 {
+  color: #1877f2;
+  margin-bottom: 5px;
+}
+
+.fb-friends-heading p {
+  color: #687684;
+}
+
+.fb-friends-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 18px;
+}
+
+.fb-friends-tabs button {
+  border: 0;
+  background: transparent;
+  color: #4b5563;
+  padding: 11px 13px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  font-weight: 600;
+}
+
+.fb-friends-tabs button.active {
+  color: #1877f2;
+  border-bottom-color: #1877f2;
+}
+
+.fb-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 20px;
+  color: #fff;
+  background: #e53935;
+  font-size: 12px;
+}
+
+.fb-search-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.fb-refresh-button {
+  border: 0;
+  background: #eef5ff;
+  color: #1877f2;
+  border-radius: 7px;
+  padding: 9px 12px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fb-people-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fb-person-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid #edf0f2;
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.fb-person-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 54px;
+  background: #e7f3ff;
+}
+
+.fb-person-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1877f2;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.fb-person-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fb-person-info strong {
+  color: #1c1e21;
+}
+
+.fb-person-info span,
+.fb-person-info small {
+  color: #687684;
+}
+
+.fb-person-info p {
+  color: #4b5563;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.fb-person-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fb-button {
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 12px;
+  background: #1877f2;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fb-button-muted {
+  background: #eef0f3;
+  color: #374151;
+}
+
+.fb-button:disabled,
+.fb-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fb-status-message {
+  color: #187a3d;
+  background: #edf8f0;
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.fb-error-message {
+  color: #b42318;
+  background: #fff1f0;
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.fb-empty-state {
+  color: #687684;
+  padding: 18px 8px;
+  text-align: center;
+}
+
+.fb-subheading {
+  margin-top: 18px;
+}
+
+@media (max-width: 600px) {
+  .fb-friends-panel {
+    padding: 14px;
+  }
+
+  .fb-person-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .fb-person-actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 67px;
+  }
+
+  .fb-friends-tabs button {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+}
