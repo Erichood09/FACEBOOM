@@ -1,4 +1,4 @@
-name: FACEBOOM build check
+name: FACEBOOM build and Firebase deployment
 
 on:
   push:
@@ -12,11 +12,23 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install dependencies
         run: npm install
+
       - name: Build application
         run: npm run build
+
+      - name: Deploy to Firebase Hosting
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
+          projectId: faceboom-46273
+          channelId: live
