@@ -48,7 +48,9 @@ service cloud.firestore {
       allow read: if ownsUser(userId);
 
       allow create: if ownsUser(userId)
-        && request.resource.data.accountStatus == 'active';
+        && request.resource.data.accountStatus == 'active'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email is string;
 
       allow update: if ownsUser(userId)
         && request.resource.data.diff(resource.data).affectedKeys()
