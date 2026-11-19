@@ -14,6 +14,7 @@ import {
   getDocs,
   query,
   setDoc,
+  updateDoc,
   serverTimestamp,
   where,
   writeBatch,
@@ -287,17 +288,10 @@ test('reports are private to their reporter and moderators, and only moderators 
     createdAt: new Date(),
   }));
 
-  await assertSucceeds(setDoc(doc(moderatorDb, 'reports/report-1'), {
-    reporterId: 'alice',
-    targetUid: 'bob',
-    contentType: 'account',
-    contentId: 'bob',
-    reason: 'harassment',
-    details: 'Repeated abusive messages',
+  await assertSucceeds(updateDoc(doc(moderatorDb, 'reports/report-1'), {
     status: 'resolved',
     moderatorNote: 'Reviewed',
     resolvedAt: serverTimestamp(),
-    createdAt: new Date(),
   }));
 });
 
