@@ -87,6 +87,13 @@ test('blocking either participant denies conversation and message-history reads'
   await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob')));
   await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
 
+  // Firestore cannot filter query results using the cross-user block lookup in this list rule.
+  // Verify the current inbox query before any block exists.
+  await assertFails(getDocs(query(
+    collection(aliceDb, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+
   await seed('users/bob/blocked/alice', { uid: 'alice' });
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
