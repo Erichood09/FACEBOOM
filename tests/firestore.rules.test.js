@@ -91,6 +91,7 @@ test('blocking either participant denies conversation and message-history reads'
 
 test('blocking prevents new likes and comments on the other member posts', async () => {
   await seed('posts/post-2', { authorId: 'bob', text: 'Post' });
+  await seed('posts/post-3', { authorId: 'bob', text: 'Another post' });
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
   await assertSucceeds(setDoc(doc(aliceDb, 'posts/post-2/likes/alice'), {
@@ -103,7 +104,7 @@ test('blocking prevents new likes and comments on the other member posts', async
   }));
 
   await seed('users/bob/blocked/alice', { uid: 'alice' });
-  await assertFails(setDoc(doc(aliceDb, 'posts/post-2/likes/alice-2'), {
+  await assertFails(setDoc(doc(aliceDb, 'posts/post-3/likes/alice'), {
     userId: 'alice',
   }));
   await assertFails(setDoc(doc(aliceDb, 'posts/post-2/comments/comment-after-block'), {
