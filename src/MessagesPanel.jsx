@@ -57,6 +57,14 @@ export default function MessagesPanel({ user, profile, onBack }) {
   }, [user.uid]);
 
   useEffect(() => {
+    if (selectedPerson && blockedUserIds.includes(selectedPerson.uid)) {
+      setSelectedPerson(null);
+      setMessages([]);
+      setError('This member is blocked. You can manage blocked members in Find Friends.');
+    }
+  }, [blockedUserIds, selectedPerson]);
+
+  useEffect(() => {
     const q = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', user.uid)
@@ -84,6 +92,11 @@ export default function MessagesPanel({ user, profile, onBack }) {
         .toLowerCase().includes(term)
     );
   }, [people, search, blockedUserIds]);
+
+  const visibleConversations = conversations.filter((conversation) => {
+    const otherUid = conversation.participants.find((uid) => uid !== user.uid);
+    return otherUid && !blockedUserIds.includes(otherUid);
+  });
 
   const selectedConversation = selectedPerson
     ? conversations.find((item) => item.id === conversationIdFor(user.uid, selectedPerson.uid))
@@ -176,8 +189,8 @@ export default function MessagesPanel({ user, profile, onBack }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(230px, 0.85fr) minmax(280px, 1.5fr)', gap: 14 }}>
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Your Inbox</h3>
-          {conversations.length === 0 && <p style={{ color: '#666' }}>No conversations yet. Search for a member below to send the first message.</p>}
-          {conversations.map((conversation) => {
+          {visibleConversations.length === 0 && <p style={{ color: '#666' }}>No conversations yet. Search for a member below to send the first message.</p>}
+          {visibleConversations.map((conversation) => {
             const otherUid = conversation.participants.find((uid) => uid !== user.uid);
             const person = people.find((item) => item.uid === otherUid);
             const active = selectedPerson?.uid === otherUid;
