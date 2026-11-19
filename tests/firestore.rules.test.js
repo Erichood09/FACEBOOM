@@ -43,6 +43,25 @@ async function seed(path, data) {
   });
 }
 
+test('members can update profile fields but cannot change the stored authentication email', async () => {
+  await seed('users/alice', {
+    fullName: 'Alice',
+    username: 'alice',
+    country: 'Nigeria',
+    bio: '',
+    email: 'alice@example.com',
+    accountStatus: 'active',
+  });
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  await assertSucceeds(updateDoc(doc(aliceDb, 'users/alice'), {
+    bio: 'Hello FACEBOOM',
+  }));
+  await assertFails(updateDoc(doc(aliceDb, 'users/alice'), {
+    email: 'attacker@example.com',
+  }));
+});
+
 test('a member can read a public profile unless either member has blocked the other', async () => {
   await seed('publicProfiles/bob', { uid: 'bob', fullName: 'Bob' });
 
