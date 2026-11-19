@@ -129,16 +129,25 @@ export default function FriendsPanel({ user, profile, onBack }) {
       }
 
       try {
+        // A blocked member's public profile is intentionally unreadable under
+        // the security rules. Use the private block record for a safe label.
         const profiles = await Promise.all(blockedUserIds.map(async (uid) => {
-          const snapshot = await getDoc(doc(db, 'publicProfiles', uid));
-          return snapshot.exists()
-            ? publicProfile(snapshot.data(), uid)
-            : { uid, fullName: 'FACEBOOM Member', username: '', country: '', bio: '', photoURL: '', coverPhotoURL: '' };
+          const snapshot = await getDoc(doc(db, 'users', user.uid, 'blocked', uid));
+          const data = snapshot.exists() ? snapshot.data() : {};
+          return {
+            uid,
+            fullName: data.fullName || 'FACEBOOM Member',
+            username: '',
+            country: '',
+            bio: '',
+            photoURL: '',
+            coverPhotoURL: ''
+          };
         }));
         if (active) setBlockedPeople(profiles);
       } catch (err) {
-        console.error('Load blocked member profiles:', err);
-        if (active) setError('Unable to load blocked member details. You can still unblock members from this list.');
+        console.error('Load blocked member records:', err);
+        if (active) setError('Unable to load your block list. Please refresh the page.');
       }
     }
 
