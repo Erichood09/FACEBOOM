@@ -91,7 +91,10 @@ service cloud.firestore {
 
     // PUBLIC PROFILE DIRECTORY
     match /publicProfiles/{userId} {
-      allow read: if signedIn();
+      // Keep directory queries available for discovery. A direct profile lookup
+      // is denied when either member has blocked the other.
+      allow get: if signedIn() && !blockedEither(request.auth.uid, userId);
+      allow list: if signedIn();
 
       allow create, update: if ownsUser(userId)
         && request.resource.data.uid == userId
@@ -111,7 +114,10 @@ service cloud.firestore {
 
     // POSTS
     match /posts/{postId} {
-      allow read: if signedIn();
+      // Feed queries are filtered client-side; direct post links respect blocks.
+      allow get: if signedIn()
+        && !blockedEither(request.auth.uid, resource.data.authorId);
+      allow list: if signedIn();
 
       allow create: if signedIn()
         && request.resource.data.authorId == request.auth.uid;
@@ -127,7 +133,11 @@ service cloud.firestore {
 
         allow create: if signedIn()
           && likeId == request.auth.uid
-          && request.resource.data.userId == request.auth.uid;
+          && request.resource.data.userId == request.auth.uid
+          && !blockedEither(
+            request.auth.uid,
+            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
+          );
 
         allow update: if false;
 
@@ -144,6 +154,10 @@ service cloud.firestore {
 
         allow create: if signedIn()
           && request.resource.data.authorId == request.auth.uid
+          && !blockedEither(
+            request.auth.uid,
+            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
+          )
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;
@@ -210,7 +224,11 @@ service cloud.firestore {
         }
 
         allow read: if signedIn()
-          && parentConversation().data.participants.hasAny([request.auth.uid]);
+          && parentConversation().data.participants.hasAny([request.auth.uid])
+          && !blockedEither(
+            parentConversation().data.participants[0],
+            parentConversation().data.participants[1]
+          );
 
         allow create: if signedIn()
           && parentConversation().data.participants.hasAny([request.auth.uid])
