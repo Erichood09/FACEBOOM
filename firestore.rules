@@ -127,6 +127,23 @@ service cloud.firestore {
           );
       }
 
+      // The blocked member can read who blocked them so the client can hide
+      // that relationship from discovery, feed and messaging views.
+      // Only the original blocker may create or remove this mirror.
+      match /blockedBy/{blockerUid} {
+        allow read: if ownsUser(userId);
+        allow create: if signedIn()
+          && request.auth.uid == blockerUid
+          && userId != blockerUid
+          && request.resource.data.uid == blockerUid
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && existsAfter(
+            /databases/$(database)/documents/users/$(blockerUid)/blocked/$(userId)
+          );
+        allow delete: if signedIn() && request.auth.uid == blockerUid;
+        allow update: if false;
+      }
+
       // A member can manage only their own block list.
       match /blocked/{blockedUid} {
         allow read: if ownsUser(userId);
