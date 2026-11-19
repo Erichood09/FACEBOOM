@@ -244,6 +244,63 @@ test('a persisted block allows later cleanup of both inbox summaries', async () 
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
 });
 
+
+test('reports are private to their reporter and moderators, and only moderators can update them', async () => {
+  await seed('reports/report-1', {
+    reporterId: 'alice',
+    targetUid: 'bob',
+    contentType: 'account',
+    contentId: 'bob',
+    reason: 'harassment',
+    details: 'Repeated abusive messages',
+    status: 'open',
+    createdAt: new Date(),
+  });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  const moderatorDb = testEnv.authenticatedContext('mod', { moderator: true }).firestore();
+
+  await assertSucceeds(getDoc(doc(aliceDb, 'reports/report-1')));
+  await assertFails(getDoc(doc(bobDb, 'reports/report-1')));
+  await assertSucceeds(getDoc(doc(moderatorDb, 'reports/report-1')));
+
+  await assertFails(setDoc(doc(bobDb, 'reports/fake-report'), {
+    reporterId: 'alice',
+    targetUid: 'bob',
+    contentType: 'account',
+    contentId: 'bob',
+    reason: 'spam',
+    details: '',
+    status: 'open',
+    createdAt: serverTimestamp(),
+  }));
+
+  await assertFails(setDoc(doc(aliceDb, 'reports/report-1'), {
+    reporterId: 'alice',
+    targetUid: 'bob',
+    contentType: 'account',
+    contentId: 'bob',
+    reason: 'harassment',
+    details: 'Changed by reporter',
+    status: 'resolved',
+    createdAt: new Date(),
+  }));
+
+  await assertSucceeds(setDoc(doc(moderatorDb, 'reports/report-1'), {
+    reporterId: 'alice',
+    targetUid: 'bob',
+    contentType: 'account',
+    contentId: 'bob',
+    reason: 'harassment',
+    details: 'Repeated abusive messages',
+    status: 'resolved',
+    moderatorNote: 'Reviewed',
+    resolvedAt: serverTimestamp(),
+    createdAt: new Date(),
+  }));
+});
+
 test('a first message and both inbox summaries can be created atomically', async () => {
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
   const conversationId = 'alice_bob';
