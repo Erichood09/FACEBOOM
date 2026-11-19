@@ -85,7 +85,6 @@ test('the inbox query works from the owner path and is denied to other members',
   await assertSucceeds(getDocs(collection(aliceDb, 'users', 'alice', 'inbox')));
   await assertFails(getDocs(collection(bobDb, 'users', 'alice', 'inbox')));
   await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob')));
-  await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')).catch(() => null));
 });
 
 test('blocking either participant denies conversation and message-history reads', async () => {
