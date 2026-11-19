@@ -409,9 +409,18 @@ export default function FriendsPanel({ user, profile, onBack }) {
                 {friend.username && <span>@{friend.username}</span>}
                 {friend.country && <small>{friend.country}</small>}
               </div>
-              <button className="fb-button fb-button-muted" onClick={() => removeFriend(friend)} disabled={busyId === (friend.uid || friend.id)}>
-                Remove
-              </button>
+              <div className="fb-person-actions">
+                <SafetyActions
+                  user={user}
+                  targetUid={friend.uid || friend.id}
+                  targetName={friend.fullName}
+                  contentType="account"
+                  contentId={friend.uid || friend.id}
+                />
+                <button className="fb-button fb-button-muted" onClick={() => removeFriend(friend)} disabled={busyId === (friend.uid || friend.id)}>
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
           {friends.length === 0 && <p className="fb-empty-state">Your accepted friends will appear here.</p>}
