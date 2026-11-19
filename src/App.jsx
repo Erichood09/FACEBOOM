@@ -4,6 +4,7 @@ import FriendsPanel from './FriendsPanel';
 import MessagesPanel from './MessagesPanel';
 import SafetyActions from './SafetyActions';
 import ShareActions from './ShareActions';
+import ModeratorPanel from './ModeratorPanel';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -13,6 +14,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  getIdTokenResult,
   signOut
 } from 'firebase/auth';
 
@@ -62,6 +64,8 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const [showModerator, setShowModerator] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
   const [sharedProfile, setSharedProfile] = useState(null);
   const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
   const [sharedProfileError, setSharedProfileError] = useState('');
@@ -97,6 +101,23 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Read the trusted moderator claim from the signed-in Firebase token.
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setIsModerator(false);
+      setShowModerator(false);
+      return undefined;
+    }
+    getIdTokenResult(user, true).then((token) => {
+      if (active) setIsModerator(token.claims.moderator === true);
+    }).catch((err) => {
+      console.error('Moderator permission check:', err);
+      if (active) setIsModerator(false);
+    });
+    return () => { active = false; };
+  }, [user]);
 
   // LOAD PROFILE
   useEffect(() => {
@@ -477,6 +498,7 @@ function App() {
       setShowProfile(false);
       setShowFriends(false);
       setShowMessages(false);
+      setShowModerator(false);
       setEditingProfile(false);
     } catch (err) {
       console.error(err);
@@ -913,6 +935,7 @@ function App() {
               setShowProfile(false);
               setShowFriends(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
             }}
           >
@@ -925,6 +948,7 @@ function App() {
               setShowProfile(true);
               setShowFriends(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
               setProfileMessage('');
               setProfileError('');
@@ -938,6 +962,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
               setShowFriends(true);
             }}
@@ -951,11 +976,27 @@ function App() {
               setShowProfile(false);
               setShowFriends(false);
               setShowMessages(true);
+              setShowModerator(false);
               setEditingProfile(false);
             }}
           >
             Messages
           </button>
+
+          {isModerator && (
+            <button
+              style={headerButtonStyle}
+              onClick={() => {
+                setShowProfile(false);
+                setShowFriends(false);
+                setShowMessages(false);
+                setShowModerator(true);
+                setEditingProfile(false);
+              }}
+            >
+              Moderation
+            </button>
+          )}
 
           <button
             style={logoutButtonStyle}
@@ -1005,6 +1046,8 @@ function App() {
               url={`${window.location.origin}${window.location.pathname}?profile=${sharedProfile.uid}`}
             />
           </div>
+        ) : showModerator && isModerator ? (
+          <ModeratorPanel onBack={() => setShowModerator(false)} />
         ) : showMessages ? (
           <MessagesPanel
             user={user}
