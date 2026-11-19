@@ -313,3 +313,76 @@ video {
     font-size: 13px;
   }
 }
+
+
+/* REPORTING AND BLOCKING */
+.fb-safety-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.fb-safety-link {
+  border: 0;
+  background: transparent;
+  color: #b42318;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 2px;
+  font-size: 13px;
+}
+
+.fb-safety-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fb-report-form {
+  display: grid;
+  gap: 9px;
+  width: 100%;
+  max-width: 420px;
+  padding: 12px;
+  border: 1px solid #e2e5e9;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.fb-report-form label {
+  display: grid;
+  gap: 5px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.fb-report-form select,
+.fb-report-form textarea {
+  width: 100%;
+  border: 1px solid #cfd5dc;
+  border-radius: 7px;
+  padding: 9px;
+  font: inherit;
+  background: #fff;
+}
+
+.fb-report-form textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.fb-report-form button {
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 12px;
+  cursor: pointer;
+  background: #1877f2;
+  color: #fff;
+}
+
+.fb-report-form button[type="button"] {
+  background: #e9edf2;
+  color: #374151;
+}
