@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -9,14 +8,24 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
-  updateDoc,
+  writeBatch,
   where
 } from 'firebase/firestore';
 import { db } from './firebase';
 import SafetyActions from './SafetyActions';
 
 const conversationIdFor = (a, b) => [a, b].sort().join('_');
+
+function inboxSummary(userUid, otherUid, conversationId, conversation) {
+  return {
+    conversationId,
+    participants: [userUid, otherUid].sort(),
+    otherUid,
+    lastMessage: conversation.lastMessage || '',
+    lastSenderId: conversation.lastSenderId || '',
+    updatedAt: serverTimestamp()
+  };
+}
 
 export default function MessagesPanel({ user, profile, onBack }) {
   const [people, setPeople] = useState([]);
@@ -30,11 +39,9 @@ export default function MessagesPanel({ user, profile, onBack }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snap) => {
-      setBlockedUserIds(snap.docs.map((item) => item.id));
-    }, (err) => console.error('Load block list:', err));
-  }, [user.uid]);
+  useEffect(() => onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snap) => {
+    setBlockedUserIds(snap.docs.map((item) => item.id));
+  }, (err) => console.error('Load block list:', err)), [user.uid]);
 
   useEffect(() => {
     let active = true;
@@ -64,21 +71,17 @@ export default function MessagesPanel({ user, profile, onBack }) {
     }
   }, [blockedUserIds, selectedPerson]);
 
+  // The inbox query is scoped to the signed-in member's own path. Firestore
+  // can authorize this query without trying to filter cross-user block records.
   useEffect(() => {
-    const q = query(
-      collection(db, 'conversations'),
-      where('participants', 'array-contains', user.uid)
+    const inboxQuery = query(
+      collection(db, 'users', user.uid, 'inbox'),
+      orderBy('updatedAt', 'desc')
     );
-    return onSnapshot(q, (snap) => {
-      const rows = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
-      rows.sort((a, b) => {
-        const aTime = a.updatedAt?.toMillis?.() || 0;
-        const bTime = b.updatedAt?.toMillis?.() || 0;
-        return bTime - aTime;
-      });
-      setConversations(rows);
+    return onSnapshot(inboxQuery, (snap) => {
+      setConversations(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
     }, (err) => {
-      console.error('Load conversations:', err);
+      console.error('Load inbox:', err);
       setError(`Inbox error (${err.code || 'unknown'}): ${err.message || 'Unable to load your inbox.'}`);
     });
   }, [user.uid]);
@@ -93,14 +96,45 @@ export default function MessagesPanel({ user, profile, onBack }) {
     );
   }, [people, search, blockedUserIds]);
 
-  const visibleConversations = conversations.filter((conversation) => {
-    const otherUid = conversation.participants.find((uid) => uid !== user.uid);
-    return otherUid && !blockedUserIds.includes(otherUid);
-  });
+  const visibleConversations = conversations.filter(
+    (conversation) => conversation.otherUid && !blockedUserIds.includes(conversation.otherUid)
+  );
 
   const selectedConversation = selectedPerson
     ? conversations.find((item) => item.id === conversationIdFor(user.uid, selectedPerson.uid))
     : null;
+
+  async function openPerson(person) {
+    if (!person || blockedUserIds.includes(person.uid)) return;
+    setSelectedPerson(person);
+    setMessages([]);
+    setError('');
+
+    // Lazy migration: when a member opens an older conversation, create the
+    // two owner-scoped inbox summaries so it appears in both inboxes.
+    try {
+      const conversationId = conversationIdFor(user.uid, person.uid);
+      const conversationRef = doc(db, 'conversations', conversationId);
+      const existing = await getDoc(conversationRef);
+      if (existing.exists()) {
+        const data = existing.data();
+        const batch = writeBatch(db);
+        batch.set(
+          doc(db, 'users', user.uid, 'inbox', conversationId),
+          inboxSummary(user.uid, person.uid, conversationId, data)
+        );
+        batch.set(
+          doc(db, 'users', person.uid, 'inbox', conversationId),
+          inboxSummary(person.uid, user.uid, conversationId, data)
+        );
+        await batch.commit();
+      }
+    } catch (err) {
+      // Opening a new chat has no conversation to migrate. A blocked or
+      // inaccessible old conversation will show a clear message on send.
+      console.info('Inbox migration skipped:', err.code || err.message);
+    }
+  }
 
   useEffect(() => {
     if (!selectedPerson || !selectedConversation) {
@@ -115,7 +149,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
       setMessages(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
     }, (err) => {
       console.error('Load messages:', err);
-      setError('Unable to load this conversation.');
+      setError('Unable to load this conversation. It may be blocked or unavailable.');
     });
   }, [selectedPerson, selectedConversation?.id]);
 
@@ -127,17 +161,23 @@ export default function MessagesPanel({ user, profile, onBack }) {
       setError('Messages must be 4,000 characters or fewer.');
       return;
     }
+    if (blockedUserIds.includes(selectedPerson.uid)) {
+      setError('You cannot message a member you have blocked.');
+      return;
+    }
 
     setSending(true);
     setError('');
     try {
-      const conversationId = conversationIdFor(user.uid, selectedPerson.uid);
+      const otherUid = selectedPerson.uid;
+      const conversationId = conversationIdFor(user.uid, otherUid);
       const conversationRef = doc(db, 'conversations', conversationId);
       const existing = await getDoc(conversationRef);
-      const participants = [user.uid, selectedPerson.uid].sort();
+      const participants = [user.uid, otherUid].sort();
+      const batch = writeBatch(db);
 
       if (!existing.exists()) {
-        await setDoc(conversationRef, {
+        batch.set(conversationRef, {
           participants,
           createdBy: user.uid,
           lastMessage: text,
@@ -146,19 +186,38 @@ export default function MessagesPanel({ user, profile, onBack }) {
           updatedAt: serverTimestamp()
         });
       } else {
-        await updateDoc(conversationRef, {
+        batch.update(conversationRef, {
           lastMessage: text,
           lastSenderId: user.uid,
           updatedAt: serverTimestamp()
         });
       }
 
-      await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
+      const messageRef = doc(collection(db, 'conversations', conversationId, 'messages'));
+      batch.set(messageRef, {
         text,
         senderId: user.uid,
         senderName: profile.fullName || user.email || 'FACEBOOM Member',
         createdAt: serverTimestamp()
       });
+
+      const summary = {
+        conversationId,
+        participants,
+        lastMessage: text,
+        lastSenderId: user.uid,
+        updatedAt: serverTimestamp()
+      };
+      batch.set(doc(db, 'users', user.uid, 'inbox', conversationId), {
+        ...summary,
+        otherUid
+      });
+      batch.set(doc(db, 'users', otherUid, 'inbox', conversationId), {
+        ...summary,
+        otherUid: user.uid
+      });
+
+      await batch.commit();
       setDraft('');
     } catch (err) {
       console.error('Send message:', err);
@@ -169,10 +228,12 @@ export default function MessagesPanel({ user, profile, onBack }) {
   }
 
   function openConversation(conversation) {
-    const otherUid = conversation.participants.find((uid) => uid !== user.uid);
-    const person = people.find((item) => item.uid === otherUid);
-    setSelectedPerson(person || { uid: otherUid, fullName: 'FACEBOOM Member', username: '' });
-    setError('');
+    const person = people.find((item) => item.uid === conversation.otherUid);
+    openPerson(person || {
+      uid: conversation.otherUid,
+      fullName: 'FACEBOOM Member',
+      username: ''
+    });
   }
 
   const panelStyle = { background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 16, marginBottom: 16 };
@@ -191,9 +252,8 @@ export default function MessagesPanel({ user, profile, onBack }) {
           <h3 style={{ marginTop: 0 }}>Your Inbox</h3>
           {visibleConversations.length === 0 && <p style={{ color: '#666' }}>No conversations yet. Search for a member below to send the first message.</p>}
           {visibleConversations.map((conversation) => {
-            const otherUid = conversation.participants.find((uid) => uid !== user.uid);
-            const person = people.find((item) => item.uid === otherUid);
-            const active = selectedPerson?.uid === otherUid;
+            const person = people.find((item) => item.uid === conversation.otherUid);
+            const active = selectedPerson?.uid === conversation.otherUid;
             return (
               <button key={conversation.id} type="button" onClick={() => openConversation(conversation)} style={{ ...(active ? activeStyle : buttonStyle), display: 'block', width: '100%', textAlign: 'left', marginBottom: 8 }}>
                 <strong>{person?.fullName || 'FACEBOOM Member'}</strong>
@@ -205,7 +265,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
           <h3>Message anyone</h3>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, username or country" style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: '1px solid #ccc', borderRadius: 8, marginBottom: 10 }} />
           {loadingPeople ? <p>Loading members...</p> : filteredPeople.length === 0 ? <p style={{ color: '#666' }}>No matching members found.</p> : filteredPeople.slice(0, 50).map((person) => (
-            <button key={person.uid} type="button" onClick={() => { setSelectedPerson(person); setError(''); }} style={{ ...(selectedPerson?.uid === person.uid ? activeStyle : buttonStyle), display: 'block', width: '100%', textAlign: 'left', marginBottom: 7 }}>
+            <button key={person.uid} type="button" onClick={() => openPerson(person)} style={{ ...(selectedPerson?.uid === person.uid ? activeStyle : buttonStyle), display: 'block', width: '100%', textAlign: 'left', marginBottom: 7 }}>
               <strong>{person.fullName || 'FACEBOOM Member'}</strong>
               <span style={{ display: 'block', color: '#666', fontSize: 12 }}>@{person.username || 'member'} {person.country ? `· ${person.country}` : ''}</span>
             </button>
@@ -223,13 +283,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: 10, marginBottom: 12 }}>
                 <strong>{selectedPerson.fullName || 'FACEBOOM Member'}</strong>
                 <div style={{ color: '#666', fontSize: 13 }}>Private conversation</div>
-                <SafetyActions
-                  user={user}
-                  targetUid={selectedPerson.uid}
-                  targetName={selectedPerson.fullName}
-                  contentType="account"
-                  contentId={selectedPerson.uid}
-                />
+                <SafetyActions user={user} targetUid={selectedPerson.uid} targetName={selectedPerson.fullName} contentType="account" contentId={selectedPerson.uid} />
               </div>
               <div style={{ flex: 1, minHeight: 280, maxHeight: 440, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 9, padding: '4px 2px' }}>
                 {!selectedConversation && <p style={{ color: '#666', textAlign: 'center' }}>This is the start of your conversation. Send a message when you're ready.</p>}
@@ -238,15 +292,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
                   return <div key={message.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%', background: mine ? '#e7f1ff' : '#f1f3f5', padding: '9px 12px', borderRadius: 12, overflowWrap: 'anywhere' }}>
                     <div style={{ fontSize: 11, color: '#666', marginBottom: 3 }}>{mine ? 'You' : (message.senderName || selectedPerson.fullName)}</div>
                     <div style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
-                    {!mine && (
-                      <SafetyActions
-                        user={user}
-                        targetUid={message.senderId}
-                        targetName={message.senderName || selectedPerson.fullName}
-                        contentType="message"
-                        contentId={message.id}
-                      />
-                    )}
+                    {!mine && <SafetyActions user={user} targetUid={message.senderId} targetName={message.senderName || selectedPerson.fullName} contentType="message" contentId={message.id} />}
                   </div>;
                 })}
               </div>
