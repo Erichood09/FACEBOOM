@@ -181,8 +181,15 @@ service cloud.firestore {
       // document exists before creating it. Existing conversations remain
       // readable only by their two participants.
       allow get: if signedIn()
-        && (resource == null || isParticipant());
-      allow list: if isParticipant();
+        && (
+          resource == null ||
+          (
+            isParticipant() &&
+            !blockedEither(resource.data.participants[0], resource.data.participants[1])
+          )
+        );
+      allow list: if isParticipant()
+        && !blockedEither(resource.data.participants[0], resource.data.participants[1]);
 
       allow create: if signedIn()
         && request.resource.data.keys().hasAll([
