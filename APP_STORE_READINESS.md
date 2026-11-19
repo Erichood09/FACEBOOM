@@ -16,7 +16,7 @@ This is an engineering readiness record, not a statement that FACEBOOM is approv
 - Report submission controls for posts, accounts and comments in the feed, and for accounts/messages in the messaging UI.
 - A moderator report queue guarded by the Firebase Auth custom claim `moderator == true`.
 - Per-member block lists and client-side filtering of blocked members from friend discovery, message discovery/inbox, and the current member's feed.
-- A GitHub Actions build and Firebase Hosting deployment workflow.
+- A GitHub Actions workflow that runs Firestore Emulator security tests and builds the web app; push-to-main events are configured to deploy Firebase Hosting.
 
 A successful web build or Hosting deployment does not establish store readiness or prove live Firestore behavior.
 
@@ -30,7 +30,7 @@ A successful web build or Hosting deployment does not establish store readiness 
 6. **Privacy and legal pages are drafts only.** The policy, terms and community guidelines still contain owner decisions and placeholders. They must be verified, completed, legally reviewed where appropriate, published at stable public URLs, and linked inside the app.
 7. **Mobile app packaging is not present.** This repository is a web app, not a signed Android App Bundle or iOS app archive. A mobile strategy, real-device testing, store assets and release pipelines remain necessary.
 8. **Security and abuse controls need review.** Verify Cloudinary unsigned preset restrictions, permitted formats, upload limits, moderation and cleanup. Never put Cloudinary API secrets or Firebase Admin credentials in browser code.
-9. **Automated security tests have limited confirmed coverage.** GitHub Actions successfully ran five Firestore Emulator scenarios on 2026-11-19: blocked public-profile reads, blocked direct-post reads, conversation/message-history read denial, blocked like/comment creation, and blocked friend-request/message creation. The application build also passed. These tests do not cover account lifecycle, reports, invitations, every query path, UI behavior, or production data. A green build is not a substitute for end-to-end testing.
+9. **Automated security tests have limited confirmed coverage.** GitHub Actions successfully ran nine Firestore Emulator regression tests and the application production build on 2026-11-19. The tests cover public-profile access, direct-post access, owner-only inbox queries, conversation/message-history denial after blocking, blocked like/comment creation, blocked friend-request/message creation, atomic inbox cleanup, cleanup after a persisted block, and atomic first-message plus inbox creation. These tests do not cover account lifecycle, reports, invitations, every query path, UI behavior, or production data. A green build is not a substitute for end-to-end testing.
 10. **Operational and store details remain open.** Confirm support contact, publisher/legal name, age rating, target audience, data-safety disclosures, privacy URL, reviewer instructions, retention schedule and moderation response commitments.
 
 ## Required work before submission
@@ -68,9 +68,9 @@ The safety pull request must remain a draft until the owner reviews it and the r
 
 A Firestore Emulator test harness is now included on this review branch:
 - `npm run test:rules` starts the Firestore Emulator and runs Node's built-in test runner.
-- The current automated cases check direct public-profile access, direct post access, and conversation/message-history access when either participant has blocked the other.
+- The current nine automated cases check profile and post access, owner-only inbox queries, reciprocal block enforcement for conversation history and social actions, inbox cleanup, and atomic first-message creation.
 - The pull-request workflow runs these rules tests before the production build step.
 - These tests run against the draft `firestore.rules` file only. They do not publish rules to the live Firebase project.
 
-The first CI run must complete successfully before treating the tests as verified. The suite is an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
+The latest draft-branch CI run completed successfully: all nine Firestore Emulator regression tests and the production build passed. The suite is still an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
 
