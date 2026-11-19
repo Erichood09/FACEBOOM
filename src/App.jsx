@@ -184,9 +184,31 @@ function App() {
       setBlockedUserIds([]);
       return undefined;
     }
-    return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
-      setBlockedUserIds(snapshot.docs.map((item) => item.id));
-    }, (err) => console.error('Block list error:', err));
+    let ownBlocks = [];
+    let incomingBlocks = [];
+    const updateHiddenMembers = () => {
+      setBlockedUserIds([...new Set([...ownBlocks, ...incomingBlocks])]);
+    };
+    const unsubscribeOwn = onSnapshot(
+      collection(db, 'users', user.uid, 'blocked'),
+      (snapshot) => {
+        ownBlocks = snapshot.docs.map((item) => item.id);
+        updateHiddenMembers();
+      },
+      (err) => console.error('Block list error:', err)
+    );
+    const unsubscribeIncoming = onSnapshot(
+      collection(db, 'users', user.uid, 'blockedBy'),
+      (snapshot) => {
+        incomingBlocks = snapshot.docs.map((item) => item.id);
+        updateHiddenMembers();
+      },
+      (err) => console.error('Incoming block list error:', err)
+    );
+    return () => {
+      unsubscribeOwn();
+      unsubscribeIncoming();
+    };
   }, [user]);
 
   // OPEN A SHARED PUBLIC PROFILE LINK
