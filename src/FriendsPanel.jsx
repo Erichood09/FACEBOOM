@@ -34,6 +34,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
   const [outgoing, setOutgoing] = useState([]);
   const [friends, setFriends] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
+  const [blockedByUserIds, setBlockedByUserIds] = useState([]);
   const [blockedPeople, setBlockedPeople] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [busyId, setBusyId] = useState('');
@@ -42,9 +43,16 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
   useEffect(() => {
     if (!user) return undefined;
-    return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
+    const unsubscribeOwn = onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
       setBlockedUserIds(snapshot.docs.map((item) => item.id));
     }, (err) => setError(err.message || 'Unable to load your block list.'));
+    const unsubscribeIncoming = onSnapshot(collection(db, 'users', user.uid, 'blockedBy'), (snapshot) => {
+      setBlockedByUserIds(snapshot.docs.map((item) => item.id));
+    }, (err) => setError(err.message || 'Unable to load incoming block relationships.'));
+    return () => {
+      unsubscribeOwn();
+      unsubscribeIncoming();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -103,12 +111,13 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
   const filteredPeople = useMemo(() => {
     const term = searchText.trim().toLowerCase();
-    const availablePeople = people.filter((person) => !blockedUserIds.includes(person.uid));
+    const hiddenIds = new Set([...blockedUserIds, ...blockedByUserIds]);
+    const availablePeople = people.filter((person) => !hiddenIds.has(person.uid));
     if (!term) return availablePeople;
     return availablePeople.filter((person) =>
       `${person.fullName} ${person.username} ${person.country}`.toLowerCase().includes(term)
     );
-  }, [people, searchText, blockedUserIds]);
+  }, [people, searchText, blockedUserIds, blockedByUserIds]);
 
   useEffect(() => {
     let active = true;
@@ -281,6 +290,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
   }
 
   function personCard(person, mode = 'discover') {
+    if (mode !== 'blocked' && (blockedUserIds.includes(person.uid) || blockedByUserIds.includes(person.uid))) return null;
     const friend = isFriend(person.uid);
     const incomingItem = incomingRequest(person.uid);
     const outgoingItem = outgoingRequest(person.uid);
