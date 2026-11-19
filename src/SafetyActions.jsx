@@ -56,16 +56,26 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
     let blockSaved = false;
     try {
       const existing = await getDoc(blockRef);
+      const blockedByRef = doc(db, 'users', targetUid, 'blockedBy', user.uid);
       if (existing.exists()) {
-        await deleteDoc(blockRef);
+        const unblockBatch = writeBatch(db);
+        unblockBatch.delete(blockRef);
+        unblockBatch.delete(blockedByRef);
+        await unblockBatch.commit();
         setStatus('This member has been unblocked. The old conversation will stay out of the inbox until a new message is sent.');
       } else {
-        // Save the block first so messaging and conversation reads are denied
-        // immediately, even if inbox cleanup needs several batches.
-        await setDoc(blockRef, {
+        // Persist both directions atomically so both members' interfaces can
+        // hide each other from discovery, feed and messaging views.
+        const blockBatch = writeBatch(db);
+        blockBatch.set(blockRef, {
           uid: targetUid,
           createdAt: serverTimestamp()
         });
+        blockBatch.set(blockedByRef, {
+          uid: user.uid,
+          createdAt: serverTimestamp()
+        });
+        await blockBatch.commit();
         blockSaved = true;
 
         const inboxQuery = query(
