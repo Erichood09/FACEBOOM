@@ -1293,6 +1293,16 @@ function App() {
                           {comment.text}
                         </p>
 
+                        {comment.authorId !== user.uid && (
+                          <SafetyActions
+                            user={user}
+                            targetUid={comment.authorId}
+                            targetName={comment.authorName}
+                            contentType="comment"
+                            contentId={comment.id}
+                          />
+                        )}
+
                         <small style={{ color: '#888' }}>
                           {formatDate(comment.createdAt)}
                         </small>
