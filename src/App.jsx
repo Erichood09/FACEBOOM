@@ -764,7 +764,6 @@ function App() {
         bio: profile.bio.trim(),
         photoURL,
         coverPhotoURL,
-        email: user.email,
         updatedAt: new Date().toISOString()
       };
 
