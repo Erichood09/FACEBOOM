@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
+  documentId,
   doc,
   getDoc,
   getDocs,
@@ -63,7 +64,11 @@ export default function MessagesPanel({ user, profile, onBack }) {
     let active = true;
     async function loadPeople() {
       try {
-        const snap = await getDocs(collection(db, 'publicProfiles'));
+        const directory = collection(db, 'publicProfiles');
+        const directoryQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+          ? query(directory, where(documentId(), 'not-in', blockedUserIds))
+          : directory;
+        const snap = await getDocs(directoryQuery);
         if (!active) return;
         setPeople(snap.docs
           .filter((item) => item.id !== user.uid)
@@ -77,7 +82,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
     }
     loadPeople();
     return () => { active = false; };
-  }, [user.uid]);
+  }, [user.uid, blockedUserIds]);
 
   useEffect(() => {
     if (selectedPerson && blockedUserIds.includes(selectedPerson.uid)) {
