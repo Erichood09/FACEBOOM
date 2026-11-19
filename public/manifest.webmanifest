@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "FACEBOOM — Connect with the world",
+  "short_name": "FACEBOOM",
+  "description": "Connect with friends, share updates, photos and videos, and message people on FACEBOOM.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1877f2",
+  "icons": [
+    {
+      "src": "/faceboom-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
