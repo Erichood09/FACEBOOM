@@ -63,3 +63,14 @@ The safety pull request must remain a draft until the owner reviews it and the r
 ## Current release decision
 
 **NOT READY FOR GOOGLE PLAY OR THE APPLE APP STORE.** The current branch contains useful safety foundations and documentation, but blocking enforcement, full moderation operations, account deletion, legal pages, Terms acceptance, automated security tests and native mobile packaging remain incomplete.
+
+## Firestore rules test automation (draft branch)
+
+A Firestore Emulator test harness is now included on this review branch:
+- `npm run test:rules` starts the Firestore Emulator and runs Node's built-in test runner.
+- The current automated cases check direct public-profile access, direct post access, and conversation/message-history access when either participant has blocked the other.
+- The pull-request workflow runs these rules tests before the production build step.
+- These tests run against the draft `firestore.rules` file only. They do not publish rules to the live Firebase project.
+
+The first CI run must complete successfully before treating the tests as verified. The suite is an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
+
