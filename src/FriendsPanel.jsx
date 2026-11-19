@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
+  documentId,
   deleteDoc,
   doc,
   getDoc,
@@ -13,6 +14,8 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
+import SafetyActions from './SafetyActions';
+import ShareActions from './ShareActions';
 
 const publicProfile = (data, uid) => ({
   uid,
@@ -31,10 +34,27 @@ export default function FriendsPanel({ user, profile, onBack }) {
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [blockedUserIds, setBlockedUserIds] = useState([]);
+  const [blockedByUserIds, setBlockedByUserIds] = useState([]);
+  const [blockedPeople, setBlockedPeople] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const unsubscribeOwn = onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
+      setBlockedUserIds(snapshot.docs.map((item) => item.id));
+    }, (err) => setError(err.message || 'Unable to load your block list.'));
+    const unsubscribeIncoming = onSnapshot(collection(db, 'users', user.uid, 'blockedBy'), (snapshot) => {
+      setBlockedByUserIds(snapshot.docs.map((item) => item.id));
+    }, (err) => setError(err.message || 'Unable to load incoming block relationships.'));
+    return () => {
+      unsubscribeOwn();
+      unsubscribeIncoming();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -72,7 +92,12 @@ export default function FriendsPanel({ user, profile, onBack }) {
     setLoadingPeople(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'publicProfiles'));
+      const directory = collection(db, 'publicProfiles');
+      const hiddenIds = [...new Set([...blockedUserIds, ...blockedByUserIds])];
+      const directoryQuery = hiddenIds.length > 0 && hiddenIds.length <= 30
+        ? query(directory, where(documentId(), 'not-in', hiddenIds))
+        : directory;
+      const snapshot = await getDocs(directoryQuery);
       setPeople(snapshot.docs
         .filter((item) => item.id !== user.uid)
         .map((item) => publicProfile(item.data(), item.id)));
@@ -86,17 +111,60 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
   useEffect(() => {
     loadPeople();
-    // Load the directory once when this panel opens.
+    // Refresh directory results when either side of a block relationship changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.uid]);
+  }, [user.uid, blockedUserIds, blockedByUserIds]);
 
   const filteredPeople = useMemo(() => {
     const term = searchText.trim().toLowerCase();
-    if (!term) return people;
-    return people.filter((person) =>
+    const hiddenIds = new Set([...blockedUserIds, ...blockedByUserIds]);
+    const availablePeople = people.filter((person) => !hiddenIds.has(person.uid));
+    if (!term) return availablePeople;
+    return availablePeople.filter((person) =>
       `${person.fullName} ${person.username} ${person.country}`.toLowerCase().includes(term)
     );
-  }, [people, searchText]);
+  }, [people, searchText, blockedUserIds, blockedByUserIds]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBlockedPeople() {
+      if (blockedUserIds.length === 0) {
+        setBlockedPeople([]);
+        return;
+      }
+
+      try {
+        // A blocked member's public profile is intentionally unreadable under
+        // the security rules. Use the private block record for a safe label.
+        const profiles = await Promise.all(blockedUserIds.map(async (uid) => {
+          const snapshot = await getDoc(doc(db, 'users', user.uid, 'blocked', uid));
+          const data = snapshot.exists() ? snapshot.data() : {};
+          return {
+            uid,
+            fullName: data.fullName || 'FACEBOOM Member',
+            username: '',
+            country: '',
+            bio: '',
+            photoURL: '',
+            coverPhotoURL: ''
+          };
+        }));
+        if (active) setBlockedPeople(profiles);
+      } catch (err) {
+        console.error('Load blocked member records:', err);
+        if (active) setError('Unable to load your block list. Please refresh the page.');
+      }
+    }
+
+    loadBlockedPeople();
+    return () => { active = false; };
+  }, [blockedUserIds]);
+
+  const visibleFriends = friends.filter((friend) =>
+    !blockedUserIds.includes(friend.uid || friend.id)
+    && !blockedByUserIds.includes(friend.uid || friend.id)
+  );
 
   function isFriend(uid) {
     return friends.some((friend) => friend.uid === uid || friend.id === uid);
@@ -242,6 +310,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
   }
 
   function personCard(person, mode = 'discover') {
+    if (mode !== 'blocked' && (blockedUserIds.includes(person.uid) || blockedByUserIds.includes(person.uid))) return null;
     const friend = isFriend(person.uid);
     const incomingItem = incomingRequest(person.uid);
     const outgoingItem = outgoingRequest(person.uid);
@@ -261,7 +330,21 @@ export default function FriendsPanel({ user, profile, onBack }) {
           {person.country && <small>{person.country}</small>}
           {person.bio && <p>{person.bio}</p>}
         </div>
+        <div style={{ width: '100%', paddingLeft: 67 }}>
+          <ShareActions
+            title={`${person.fullName || 'FACEBOOM Member'} on FACEBOOM`}
+            text={`Connect with ${person.fullName || 'this member'} on FACEBOOM.`}
+            url={`${window.location.origin}${window.location.pathname}?profile=${person.uid}`}
+          />
+        </div>
         <div className="fb-person-actions">
+          <SafetyActions
+            user={user}
+            targetUid={person.uid}
+            targetName={person.fullName}
+            contentType="account"
+            contentId={person.uid}
+          />
           {friend ? (
             <button className="fb-button fb-button-muted" disabled>Friends</button>
           ) : incomingItem ? (
@@ -303,7 +386,10 @@ export default function FriendsPanel({ user, profile, onBack }) {
           Requests {incoming.length > 0 && <span className="fb-count">{incoming.length}</span>}
         </button>
         <button className={activeTab === 'friends' ? 'active' : ''} onClick={() => setActiveTab('friends')}>
-          My Friends ({friends.length})
+          My Friends ({visibleFriends.length})
+        </button>
+        <button className={activeTab === 'blocked' ? 'active' : ''} onClick={() => setActiveTab('blocked')}>
+          Blocked ({blockedUserIds.length})
         </button>
       </div>
 
@@ -358,9 +444,19 @@ export default function FriendsPanel({ user, profile, onBack }) {
         </div>
       )}
 
+      {activeTab === 'blocked' && (
+        <div className="fb-people-list">
+          <h3>Blocked Members</h3>
+          {blockedPeople.map((person) => personCard(person, 'blocked'))}
+          {blockedPeople.length === 0 && (
+            <p className="fb-empty-state">You have not blocked anyone.</p>
+          )}
+        </div>
+      )}
+
       {activeTab === 'friends' && (
         <div className="fb-people-list">
-          {friends.map((friend) => (
+          {visibleFriends.map((friend) => (
             <div className="fb-person-card" key={friend.uid || friend.id}>
               {friend.photoURL ? (
                 <img className="fb-person-avatar" src={friend.photoURL} alt="" />
@@ -374,9 +470,18 @@ export default function FriendsPanel({ user, profile, onBack }) {
                 {friend.username && <span>@{friend.username}</span>}
                 {friend.country && <small>{friend.country}</small>}
               </div>
-              <button className="fb-button fb-button-muted" onClick={() => removeFriend(friend)} disabled={busyId === (friend.uid || friend.id)}>
-                Remove
-              </button>
+              <div className="fb-person-actions">
+                <SafetyActions
+                  user={user}
+                  targetUid={friend.uid || friend.id}
+                  targetName={friend.fullName}
+                  contentType="account"
+                  contentId={friend.uid || friend.id}
+                />
+                <button className="fb-button fb-button-muted" onClick={() => removeFriend(friend)} disabled={busyId === (friend.uid || friend.id)}>
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
           {friends.length === 0 && <p className="fb-empty-state">Your accepted friends will appear here.</p>}

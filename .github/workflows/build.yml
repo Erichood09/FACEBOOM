@@ -1,5 +1,9 @@
 name: FACEBOOM build and Firebase deployment
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -11,24 +15,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
+
+      - name: Set up Java for the Firestore emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
+
+      - name: Test Firestore security rules
+        run: npm run test:rules
 
       - name: Build application
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy matching Firestore rules and Hosting release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
-          projectId: faceboom-46273
-          channelId: live
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
+        run: |
+          set -euo pipefail
+          credential_file="$RUNNER_TEMP/faceboom-firebase-service-account.json"
+          trap 'rm -f "$credential_file"' EXIT
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$credential_file"
+          export GOOGLE_APPLICATION_CREDENTIALS="$credential_file"
+          npx firebase-tools deploy --only firestore:rules,hosting --project faceboom-46273 --non-interactive

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import FriendsPanel from './FriendsPanel';
 import MessagesPanel from './MessagesPanel';
+import SafetyActions from './SafetyActions';
+import ShareActions from './ShareActions';
+import ModeratorPanel from './ModeratorPanel';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -11,6 +14,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  getIdTokenResult,
   signOut
 } from 'firebase/auth';
 
@@ -24,13 +28,15 @@ import {
   orderBy,
   onSnapshot,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  runTransaction,
+  where
 } from 'firebase/firestore';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
+  const [registering, setRegistering] = useState(() => Boolean(new URLSearchParams(window.location.search).get('invite')));
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -60,12 +66,19 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const [showModerator, setShowModerator] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [sharedProfile, setSharedProfile] = useState(null);
+  const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
+  const [sharedProfileError, setSharedProfileError] = useState('');
+  const [sharedPostId, setSharedPostId] = useState(() => new URLSearchParams(window.location.search).get('post') || '');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
 
   // POST STATES
   const [post, setPost] = useState('');
   const [posts, setPosts] = useState([]);
+  const [blockedUserIds, setBlockedUserIds] = useState([]);
   const [postLikes, setPostLikes] = useState({});
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedError, setFeedError] = useState('');
@@ -90,6 +103,23 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Read the trusted moderator claim from the signed-in Firebase token.
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setIsModerator(false);
+      setShowModerator(false);
+      return undefined;
+    }
+    getIdTokenResult(user, true).then((token) => {
+      if (active) setIsModerator(token.claims.moderator === true);
+    }).catch((err) => {
+      console.error('Moderator permission check:', err);
+      if (active) setIsModerator(false);
+    });
+    return () => { active = false; };
+  }, [user]);
 
   // LOAD PROFILE
   useEffect(() => {
@@ -123,6 +153,20 @@ function App() {
             photoURL: '',
             coverPhotoURL: ''
           };
+
+          // Repair older authenticated accounts that do not yet have a private
+          // profile document. A transaction avoids racing the registration flow.
+          await runTransaction(db, async (transaction) => {
+            const currentProfile = await transaction.get(profileRef);
+            if (!currentProfile.exists()) {
+              transaction.set(profileRef, {
+                ...loadedProfile,
+                email: user.email,
+                accountStatus: 'active',
+                createdAt: new Date().toISOString()
+              });
+            }
+          });
         }
 
         setProfile(loadedProfile);
@@ -150,6 +194,84 @@ function App() {
     loadProfile();
   }, [user]);
 
+  // LOAD THE CURRENT MEMBER'S BLOCK LIST
+  useEffect(() => {
+    if (!user) {
+      setBlockedUserIds([]);
+      return undefined;
+    }
+    let ownBlocks = [];
+    let incomingBlocks = [];
+    const updateHiddenMembers = () => {
+      setBlockedUserIds([...new Set([...ownBlocks, ...incomingBlocks])]);
+    };
+    const unsubscribeOwn = onSnapshot(
+      collection(db, 'users', user.uid, 'blocked'),
+      (snapshot) => {
+        ownBlocks = snapshot.docs.map((item) => item.id);
+        updateHiddenMembers();
+      },
+      (err) => console.error('Block list error:', err)
+    );
+    const unsubscribeIncoming = onSnapshot(
+      collection(db, 'users', user.uid, 'blockedBy'),
+      (snapshot) => {
+        incomingBlocks = snapshot.docs.map((item) => item.id);
+        updateHiddenMembers();
+      },
+      (err) => console.error('Incoming block list error:', err)
+    );
+    return () => {
+      unsubscribeOwn();
+      unsubscribeIncoming();
+    };
+  }, [user]);
+
+  // OPEN A SHARED PUBLIC PROFILE LINK
+  useEffect(() => {
+    if (!user) return undefined;
+    const profileUid = new URLSearchParams(window.location.search).get('profile');
+    if (!profileUid) {
+      setSharedProfile(null);
+      setSharedProfileError('');
+      return undefined;
+    }
+    if (profileUid === user.uid) {
+      setSharedProfile(null);
+      setSharedProfileError('');
+      setShowProfile(true);
+      setShowFriends(false);
+      setShowMessages(false);
+      return undefined;
+    }
+
+    setShowProfile(false);
+    setShowFriends(false);
+    setShowMessages(false);
+    let active = true;
+    setSharedProfileLoading(true);
+    setSharedProfileError('');
+    getDoc(doc(db, 'publicProfiles', profileUid))
+      .then((snapshot) => {
+        if (!active) return;
+        if (snapshot.exists()) {
+          setSharedProfile({ uid: profileUid, ...snapshot.data() });
+        } else {
+          setSharedProfile(null);
+          setSharedProfileError('This profile is not available.');
+        }
+      })
+      .catch((err) => {
+        console.error('Load shared profile:', err);
+        if (active) setSharedProfileError('Unable to open this profile right now.');
+      })
+      .finally(() => {
+        if (active) setSharedProfileLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [user]);
+
   // LOAD NEWS FEED
   useEffect(() => {
     if (!user) return;
@@ -157,10 +279,12 @@ function App() {
     setFeedLoading(true);
     setFeedError('');
 
-    const postsQuery = query(
-      collection(db, 'posts'),
-      orderBy('createdAt', 'desc')
-    );
+    const postsCollection = collection(db, 'posts');
+    // Firestore supports at most 30 values in a not-in filter. For typical
+    // block-list sizes, exclude blocked pairs before post data reaches the UI.
+    const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+      ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
+      : query(postsCollection, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       postsQuery,
@@ -168,7 +292,12 @@ function App() {
         const loadedPosts = snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data()
-        }));
+        })).sort((a, b) => {
+          const time = (value) => value?.toMillis
+            ? value.toMillis()
+            : new Date(value || 0).getTime();
+          return time(b.createdAt) - time(a.createdAt);
+        });
 
         setPosts(loadedPosts);
         setFeedLoading(false);
@@ -181,7 +310,7 @@ function App() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, blockedUserIds]);
 
   // LOAD LIKES
   useEffect(() => {
@@ -366,7 +495,8 @@ function App() {
 
         await setDoc(doc(db, 'users', result.user.uid), {
           ...newProfile,
-          email: email.trim(),
+          invitedBy: new URLSearchParams(window.location.search).get('invite') || '',
+          email: result.user.email,
           accountStatus: 'active',
           createdAt: new Date().toISOString()
         });
@@ -413,6 +543,7 @@ function App() {
       setShowProfile(false);
       setShowFriends(false);
       setShowMessages(false);
+      setShowModerator(false);
       setEditingProfile(false);
     } catch (err) {
       console.error(err);
@@ -678,7 +809,6 @@ function App() {
         bio: profile.bio.trim(),
         photoURL,
         coverPhotoURL,
-        email: user.email,
         updatedAt: new Date().toISOString()
       };
 
@@ -746,6 +876,12 @@ function App() {
           <h1 style={{ color: '#1877f2' }}>FACEBOOM</h1>
 
           <p>Connect with friends and the world around you.</p>
+
+          {new URLSearchParams(window.location.search).get('invite') && (
+            <p style={{ background: '#eef5ff', borderRadius: 8, padding: 12, color: '#174ea6' }}>
+              You have been invited to join FACEBOOM. Create your free account to connect with friends.
+            </p>
+          )}
 
           <h2>{registering ? 'Create Your Account' : 'Welcome Back'}</h2>
 
@@ -843,6 +979,7 @@ function App() {
               setShowProfile(false);
               setShowFriends(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
             }}
           >
@@ -855,6 +992,7 @@ function App() {
               setShowProfile(true);
               setShowFriends(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
               setProfileMessage('');
               setProfileError('');
@@ -868,6 +1006,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowMessages(false);
+              setShowModerator(false);
               setEditingProfile(false);
               setShowFriends(true);
             }}
@@ -881,11 +1020,27 @@ function App() {
               setShowProfile(false);
               setShowFriends(false);
               setShowMessages(true);
+              setShowModerator(false);
               setEditingProfile(false);
             }}
           >
             Messages
           </button>
+
+          {isModerator && (
+            <button
+              style={headerButtonStyle}
+              onClick={() => {
+                setShowProfile(false);
+                setShowFriends(false);
+                setShowMessages(false);
+                setShowModerator(true);
+                setEditingProfile(false);
+              }}
+            >
+              Moderation
+            </button>
+          )}
 
           <button
             style={logoutButtonStyle}
@@ -898,7 +1053,53 @@ function App() {
 
       <main style={mainStyle}>
 
-        {showMessages ? (
+        {sharedProfileLoading ? (
+          <div style={cardStyle}><p>Opening shared profile...</p></div>
+        ) : sharedProfileError ? (
+          <div style={cardStyle}>
+            <p style={errorStyle}>{sharedProfileError}</p>
+            <button style={primaryButtonStyle} onClick={() => {
+              setSharedProfileError('');
+              window.history.replaceState({}, '', window.location.pathname);
+            }}>Back to FACEBOOM</button>
+          </div>
+        ) : sharedProfile ? (
+          <div style={cardStyle}>
+            <button style={cancelButtonStyle} onClick={() => {
+              setSharedProfile(null);
+              window.history.replaceState({}, '', window.location.pathname);
+            }}>Back to FACEBOOM</button>
+            <div style={{ ...coverPhotoStyle, backgroundImage: `url(${sharedProfile.coverPhotoURL || ''})` }}>
+              {!sharedProfile.coverPhotoURL && <span style={coverPlaceholderStyle}>FACEBOOM cover photo</span>}
+            </div>
+            {sharedProfile.photoURL ? (
+              <img src={sharedProfile.photoURL} alt="Profile" style={profileImageStyle} />
+            ) : (
+              <div style={avatarStyle}>{(sharedProfile.fullName || 'F').charAt(0).toUpperCase()}</div>
+            )}
+            <h2>{sharedProfile.fullName || 'FACEBOOM Member'}</h2>
+            <p style={{ color: '#1877f2' }}>@{sharedProfile.username || 'member'}</p>
+            <SafetyActions
+              user={user}
+              targetUid={sharedProfile.uid}
+              targetName={sharedProfile.fullName}
+              contentType="account"
+              contentId={sharedProfile.uid}
+            />
+            {sharedProfile.country && <p><strong>Country:</strong> {sharedProfile.country}</p>}
+            <div style={bioStyle}>
+              <strong>About Me</strong>
+              <p>{sharedProfile.bio || 'This member has not added a biography.'}</p>
+            </div>
+            <ShareActions
+              title={`${sharedProfile.fullName || 'FACEBOOM Member'} on FACEBOOM`}
+              text={`Connect with ${sharedProfile.fullName || 'this member'} on FACEBOOM.`}
+              url={`${window.location.origin}${window.location.pathname}?profile=${sharedProfile.uid}`}
+            />
+          </div>
+        ) : showModerator && isModerator ? (
+          <ModeratorPanel onBack={() => setShowModerator(false)} />
+        ) : showMessages ? (
           <MessagesPanel
             user={user}
             profile={profile}
@@ -1066,6 +1267,23 @@ function App() {
                     >
                       Edit Profile
                     </button>
+                    <div style={{ marginTop: 14 }}>
+                      <h3 style={{ marginBottom: 8 }}>Share your profile</h3>
+                      <ShareActions
+                        title={`${profile.fullName || 'A FACEBOOM member'} on FACEBOOM`}
+                        text={`Connect with ${profile.fullName || 'me'} on FACEBOOM.`}
+                        url={`${window.location.origin}${window.location.pathname}?profile=${user.uid}`}
+                      />
+                    </div>
+                    <div style={{ marginTop: 18 }}>
+                      <h3 style={{ marginBottom: 8 }}>Invite friends to FACEBOOM</h3>
+                      <p style={{ marginBottom: 8, color: '#606770' }}>Share your personal invitation link with friends.</p>
+                      <ShareActions
+                        title="Join me on FACEBOOM"
+                        text={`Join me on FACEBOOM and connect with friends. Sign up using my invitation link.`}
+                        url={`${window.location.origin}${window.location.pathname}?invite=${user.uid}`}
+                      />
+                    </div>
                   </>
                 )}
 
@@ -1161,6 +1379,22 @@ function App() {
               <p style={errorStyle}>{feedError}</p>
             )}
 
+            {sharedPostId && (
+              <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <strong>You are viewing a shared post.</strong>
+                <button style={cancelButtonStyle} onClick={() => {
+                  setSharedPostId('');
+                  window.history.replaceState({}, '', window.location.pathname);
+                }}>View all posts</button>
+              </div>
+            )}
+
+            {sharedPostId && !feedLoading && posts.length > 0 && !posts.some((item) => item.id === sharedPostId) && (
+              <div style={cardStyle}>
+                <p>This shared post is not available. It may have been deleted or is no longer visible.</p>
+              </div>
+            )}
+
             {feedLoading && <p>Loading posts...</p>}
 
             {!feedLoading && posts.length === 0 && (
@@ -1169,13 +1403,13 @@ function App() {
               </div>
             )}
 
-            {posts.map((item) => {
+            {posts.filter((item) => !blockedUserIds.includes(item.authorId) && (!sharedPostId || item.id === sharedPostId)).map((item) => {
               const likes = postLikes[item.id] || {
                 count: 0,
                 likedByMe: false
               };
 
-              const comments = commentsByPost[item.id] || [];
+              const comments = (commentsByPost[item.id] || []).filter((comment) => !blockedUserIds.includes(comment.authorId));
 
               return (
                 <div key={item.id} style={cardStyle}>
@@ -1188,6 +1422,13 @@ function App() {
                       @{item.authorUsername}
                     </p>
                   )}
+                  <SafetyActions
+                    user={user}
+                    targetUid={item.authorId}
+                    targetName={item.authorName}
+                    contentType="post"
+                    contentId={item.id}
+                  />
 
                   <small style={{ color: '#777' }}>
                     {formatDate(item.createdAt)}
@@ -1221,6 +1462,12 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  <ShareActions
+                    title={`FACEBOOM post by ${item.authorName || 'a member'}`}
+                    text={item.text || 'See this photo or video on FACEBOOM.'}
+                    url={`${window.location.origin}${window.location.pathname}?post=${item.id}`}
+                  />
 
                   <hr style={dividerStyle} />
 
@@ -1272,6 +1519,16 @@ function App() {
                         <p style={commentTextStyle}>
                           {comment.text}
                         </p>
+
+                        {comment.authorId !== user.uid && (
+                          <SafetyActions
+                            user={user}
+                            targetUid={comment.authorId}
+                            targetName={comment.authorName}
+                            contentType="comment"
+                            contentId={comment.id}
+                          />
+                        )}
 
                         <small style={{ color: '#888' }}>
                           {formatDate(comment.createdAt)}
