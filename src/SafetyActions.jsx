@@ -53,6 +53,7 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
     setBusy(true);
     setStatus('');
     const blockRef = doc(db, 'users', user.uid, 'blocked', targetUid);
+    let blockSaved = false;
     try {
       const existing = await getDoc(blockRef);
       if (existing.exists()) {
@@ -65,6 +66,7 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
           uid: targetUid,
           createdAt: serverTimestamp()
         });
+        blockSaved = true;
 
         const inboxQuery = query(
           collection(db, 'users', user.uid, 'inbox'),
@@ -90,7 +92,9 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
       }
     } catch (error) {
       console.error('Block action failed:', error);
-      setStatus('Unable to update your block list. Please try again.');
+      setStatus(blockSaved
+        ? 'The member is blocked, but some inbox entries could not be cleared. Messaging remains blocked; please retry the cleanup later.'
+        : 'Unable to update your block list. Please try again.');
     } finally {
       setBusy(false);
     }
