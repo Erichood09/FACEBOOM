@@ -69,6 +69,7 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
         const blockBatch = writeBatch(db);
         blockBatch.set(blockRef, {
           uid: targetUid,
+          fullName: targetName || 'FACEBOOM Member',
           createdAt: serverTimestamp()
         });
         blockBatch.set(blockedByRef, {
