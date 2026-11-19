@@ -1071,6 +1071,13 @@ function App() {
             )}
             <h2>{sharedProfile.fullName || 'FACEBOOM Member'}</h2>
             <p style={{ color: '#1877f2' }}>@{sharedProfile.username || 'member'}</p>
+            <SafetyActions
+              user={user}
+              targetUid={sharedProfile.uid}
+              targetName={sharedProfile.fullName}
+              contentType="account"
+              contentId={sharedProfile.uid}
+            />
             {sharedProfile.country && <p><strong>Country:</strong> {sharedProfile.country}</p>}
             <div style={bioStyle}>
               <strong>About Me</strong>
