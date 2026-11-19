@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  writeBatch
+} from 'firebase/firestore';
 import { db } from './firebase';
 
 export default function SafetyActions({ user, targetUid, targetName, contentType, contentId }) {
@@ -45,13 +57,25 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
       const existing = await getDoc(blockRef);
       if (existing.exists()) {
         await deleteDoc(blockRef);
-        setStatus('This member has been unblocked.');
+        setStatus('This member has been unblocked. The old conversation will stay out of the inbox until a new message is sent.');
       } else {
-        await setDoc(blockRef, {
+        const inboxQuery = query(
+          collection(db, 'users', user.uid, 'inbox'),
+          where('otherUid', '==', targetUid)
+        );
+        const inboxSnap = await getDocs(inboxQuery);
+        const batch = writeBatch(db);
+        batch.set(blockRef, {
           uid: targetUid,
           createdAt: serverTimestamp()
         });
-        setStatus('This member has been blocked.');
+        inboxSnap.docs.forEach((item) => {
+          const conversationId = item.id;
+          batch.delete(doc(db, 'users', user.uid, 'inbox', conversationId));
+          batch.delete(doc(db, 'users', targetUid, 'inbox', conversationId));
+        });
+        await batch.commit();
+        setStatus('This member has been blocked and the conversation removed from both inboxes.');
       }
     } catch (error) {
       console.error('Block action failed:', error);
@@ -67,9 +91,7 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
   return (
     <div className="fb-safety-actions">
       {contentType && contentId && (
-        <button type="button" className="fb-safety-link" onClick={() => setReportOpen((open) => !open)}>
-          Report
-        </button>
+        <button type="button" className="fb-safety-link" onClick={() => setReportOpen((open) => !open)}>Report</button>
       )}
       {canBlock && (
         <button type="button" className="fb-safety-link" onClick={toggleBlock} disabled={busy}>
