@@ -285,8 +285,11 @@ service cloud.firestore {
           );
 
         allow create: if signedIn()
-          && parentConversation().data.participants.hasAny([request.auth.uid])
-          && !blockedEither(parentConversation().data.participants[0], parentConversation().data.participants[1])
+          && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid])
+          && !blockedEither(
+            getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants[0],
+            getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants[1]
+          )
           && request.resource.data.keys().hasAll([
             'text', 'senderId', 'senderName', 'createdAt'
           ])
