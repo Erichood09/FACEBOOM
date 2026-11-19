@@ -43,6 +43,34 @@ async function seed(path, data) {
   });
 }
 
+test('a member can create only their own profile with their authenticated email', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice', {
+    email: 'alice@example.com',
+  }).firestore();
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'users/alice'), {
+    fullName: 'Alice',
+    username: 'alice',
+    country: 'Nigeria',
+    bio: '',
+    email: 'alice@example.com',
+    accountStatus: 'active',
+    createdAt: new Date().toISOString(),
+  }));
+
+  await assertFails(setDoc(doc(aliceDb, 'users/alice'), {
+    fullName: 'Alice',
+    email: 'someone-else@example.com',
+    accountStatus: 'active',
+  }));
+
+  await assertFails(setDoc(doc(aliceDb, 'users/another-user'), {
+    fullName: 'Alice',
+    email: 'alice@example.com',
+    accountStatus: 'active',
+  }));
+});
+
 test('members can update profile fields but cannot change the stored authentication email', async () => {
   await seed('users/alice', {
     fullName: 'Alice',
