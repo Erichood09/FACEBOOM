@@ -18,7 +18,9 @@ service cloud.firestore {
     }
 
     function isModerator() {
-      return signedIn() && request.auth.token.moderator == true;
+      return signedIn()
+        && ('moderator' in request.auth.token)
+        && request.auth.token.moderator == true;
     }
 
     // A friendship may be created only in the same atomic operation
