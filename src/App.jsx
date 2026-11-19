@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import FriendsPanel from './FriendsPanel';
 import MessagesPanel from './MessagesPanel';
+import SafetyActions from './SafetyActions';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -66,6 +67,7 @@ function App() {
   // POST STATES
   const [post, setPost] = useState('');
   const [posts, setPosts] = useState([]);
+  const [blockedUserIds, setBlockedUserIds] = useState([]);
   const [postLikes, setPostLikes] = useState({});
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedError, setFeedError] = useState('');
@@ -148,6 +150,17 @@ function App() {
     }
 
     loadProfile();
+  }, [user]);
+
+  // LOAD THE CURRENT MEMBER'S BLOCK LIST
+  useEffect(() => {
+    if (!user) {
+      setBlockedUserIds([]);
+      return undefined;
+    }
+    return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
+      setBlockedUserIds(snapshot.docs.map((item) => item.id));
+    }, (err) => console.error('Block list error:', err));
   }, [user]);
 
   // LOAD NEWS FEED
@@ -1169,7 +1182,7 @@ function App() {
               </div>
             )}
 
-            {posts.map((item) => {
+            {posts.filter((item) => !blockedUserIds.includes(item.authorId)).map((item) => {
               const likes = postLikes[item.id] || {
                 count: 0,
                 likedByMe: false
@@ -1188,6 +1201,13 @@ function App() {
                       @{item.authorUsername}
                     </p>
                   )}
+                  <SafetyActions
+                    user={user}
+                    targetUid={item.authorId}
+                    targetName={item.authorName}
+                    contentType="post"
+                    contentId={item.id}
+                  />
 
                   <small style={{ color: '#777' }}>
                     {formatDate(item.createdAt)}
