@@ -451,7 +451,7 @@ function App() {
         await setDoc(doc(db, 'users', result.user.uid), {
           ...newProfile,
           invitedBy: new URLSearchParams(window.location.search).get('invite') || '',
-          email: email.trim(),
+          email: result.user.email,
           accountStatus: 'active',
           createdAt: new Date().toISOString()
         });
