@@ -87,3 +87,67 @@ test('blocking either participant denies conversation and message-history reads'
     where('participants', 'array-contains', 'alice'),
   )));
 });
+
+
+test('blocking prevents new likes and comments on the other member posts', async () => {
+  await seed('posts/post-2', { authorId: 'bob', text: 'Post' });
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'posts/post-2/likes/alice'), {
+    userId: 'alice',
+  }));
+  await assertSucceeds(setDoc(doc(aliceDb, 'posts/post-2/comments/comment-before-block'), {
+    authorId: 'alice',
+    text: 'A valid comment',
+    createdAt: new Date(),
+  }));
+
+  await seed('users/bob/blocked/alice', { uid: 'alice' });
+  await assertFails(setDoc(doc(aliceDb, 'posts/post-2/likes/alice-2'), {
+    userId: 'alice',
+  }));
+  await assertFails(setDoc(doc(aliceDb, 'posts/post-2/comments/comment-after-block'), {
+    authorId: 'alice',
+    text: 'This should be denied',
+    createdAt: new Date(),
+  }));
+});
+
+test('blocking prevents new friend requests and new messages', async () => {
+  await seed('conversations/alice_bob', {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'friendRequests/alice_bob'), {
+    fromUid: 'alice',
+    toUid: 'bob',
+    status: 'pending',
+  }));
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-before-block'), {
+    text: 'Hello',
+    senderId: 'alice',
+    senderName: 'Alice',
+    createdAt: serverTimestamp(),
+  }));
+
+  await seed('users/bob/blocked/alice', { uid: 'alice' });
+
+  await assertFails(setDoc(doc(aliceDb, 'friendRequests/alice_bob-2'), {
+    fromUid: 'alice',
+    toUid: 'bob',
+    status: 'pending',
+  }));
+  await assertFails(setDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-after-block'), {
+    text: 'This should be denied',
+    senderId: 'alice',
+    senderName: 'Alice',
+    createdAt: serverTimestamp(),
+  }));
+});
