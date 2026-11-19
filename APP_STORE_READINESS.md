@@ -30,7 +30,7 @@ A successful web build or Hosting deployment does not establish store readiness 
 6. **Privacy and legal pages are drafts only.** The policy, terms and community guidelines still contain owner decisions and placeholders. They must be verified, completed, legally reviewed where appropriate, published at stable public URLs, and linked inside the app.
 7. **Mobile app packaging is not present.** This repository is a web app, not a signed Android App Bundle or iOS app archive. A mobile strategy, real-device testing, store assets and release pipelines remain necessary.
 8. **Security and abuse controls need review.** Verify Cloudinary unsigned preset restrictions, permitted formats, upload limits, moderation and cleanup. Never put Cloudinary API secrets or Firebase Admin credentials in browser code.
-9. **Automated security tests are not confirmed.** Add Firebase Emulator tests for Firestore rules and tests for account lifecycle, reports, blocking, messaging, invitations and authorization boundaries. A green Vite build is not a substitute.
+9. **Automated security tests have limited confirmed coverage.** GitHub Actions successfully ran five Firestore Emulator scenarios on 2026-11-19: blocked public-profile reads, blocked direct-post reads, conversation/message-history read denial, blocked like/comment creation, and blocked friend-request/message creation. The application build also passed. These tests do not cover account lifecycle, reports, invitations, every query path, UI behavior, or production data. A green build is not a substitute for end-to-end testing.
 10. **Operational and store details remain open.** Confirm support contact, publisher/legal name, age rating, target audience, data-safety disclosures, privacy URL, reviewer instructions, retention schedule and moderation response commitments.
 
 ## Required work before submission
@@ -41,7 +41,7 @@ A successful web build or Hosting deployment does not establish store readiness 
 - Add explicit, versioned Terms and Community Guidelines acceptance before user-generated content.
 - Finalize and publish accurate Privacy Policy, Terms, Community Guidelines and support/contact pages.
 - Review Cloudinary preset security and media abuse controls.
-- Add automated Firestore rules and application tests; test on real devices.
+- Expand automated Firestore rules and application tests to cover account lifecycle, reports, invitations, query compatibility and authorization boundaries; test on real devices.
 - Create and verify Android/iOS builds, store listing assets, disclosures, age ratings and reviewer instructions.
 
 ## Owner decisions and information still required
