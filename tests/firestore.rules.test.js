@@ -46,6 +46,13 @@ test('a member can read a public profile unless either member has blocked the ot
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
   await assertSucceeds(getDoc(doc(aliceDb, 'publicProfiles/bob')));
 
+  // Firestore cannot filter query results using the cross-user block lookup in this list rule.
+  // The current participants-array inbox query must be tested even before any block exists.
+  await assertFails(getDocs(query(
+    collection(aliceDb, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+
   await seed('users/bob/blocked/alice', { uid: 'alice' });
   await assertFails(getDoc(doc(aliceDb, 'publicProfiles/bob')));
 });
