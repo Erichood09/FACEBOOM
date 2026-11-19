@@ -436,7 +436,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
       {activeTab === 'friends' && (
         <div className="fb-people-list">
-          {friends.map((friend) => (
+          {friends.filter((friend) => !blockedUserIds.includes(friend.uid || friend.id) && !blockedByUserIds.includes(friend.uid || friend.id)).map((friend) => (
             <div className="fb-person-card" key={friend.uid || friend.id}>
               {friend.photoURL ? (
                 <img className="fb-person-avatar" src={friend.photoURL} alt="" />
