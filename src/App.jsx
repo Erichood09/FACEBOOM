@@ -1401,7 +1401,7 @@ function App() {
                 likedByMe: false
               };
 
-              const comments = commentsByPost[item.id] || [];
+              const comments = (commentsByPost[item.id] || []).filter((comment) => !blockedUserIds.includes(comment.authorId));
 
               return (
                 <div key={item.id} style={cardStyle}>
