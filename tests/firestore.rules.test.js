@@ -209,3 +209,40 @@ test('a block batch can remove both inbox summaries atomically', async () => {
   await assertSucceeds(batch.commit());
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
 });
+
+
+test('a first message and both inbox summaries can be created atomically', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const conversationId = 'alice_bob';
+  const conversationRef = doc(aliceDb, 'conversations', conversationId);
+  const batch = writeBatch(aliceDb);
+
+  batch.set(conversationRef, {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'First hello',
+    lastSenderId: 'alice',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(aliceDb, 'conversations', conversationId, 'messages', 'first-message'), {
+    text: 'First hello',
+    senderId: 'alice',
+    senderName: 'Alice',
+    createdAt: serverTimestamp(),
+  });
+
+  for (const [ownerUid, otherUid] of [['alice', 'bob'], ['bob', 'alice']]) {
+    batch.set(doc(aliceDb, 'users', ownerUid, 'inbox', conversationId), {
+      conversationId,
+      participants: ['alice', 'bob'],
+      otherUid,
+      lastMessage: 'First hello',
+      lastSenderId: 'alice',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDocs(collection(aliceDb, 'users', 'alice', 'inbox')));
+});
