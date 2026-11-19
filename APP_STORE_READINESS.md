@@ -1,76 +1,84 @@
-# FACEBOOM App Store Readiness
+# FACEBOOM release readiness
 
-Status date: 2026-11-19  
-Branch reviewed: `store-readiness`
+Last reviewed: 2026-11-19  
+Production site: https://faceboom-46273.web.app  
+Production deployment: https://github.com/Erichood09/FACEBOOM/actions/runs/44500521612
 
-This is an engineering readiness record, not a statement that FACEBOOM is approved for either store. The current product is a React/Vite web application hosted on Firebase Hosting.
+## Current product
 
-## Confirmed in the repository
+FACEBOOM is a React/Vite web application hosted on Firebase Hosting. It now includes a Progressive Web App manifest and app icon so supported browsers can offer installation to a device home screen. This does not create a native Android or iOS binary.
 
-- Firebase Authentication and Cloud Firestore.
-- Cloudinary image/video uploads.
-- Feed posts, images/videos, likes and comments.
-- Member profiles, profile/cover photos, friend discovery, friend requests and friends.
-- One-to-one in-app messaging.
-- Share links for posts and profiles, plus invitation links and external share targets.
-- Report submission controls for posts, accounts and comments in the feed, and for accounts/messages in the messaging UI.
-- A moderator report queue guarded by the Firebase Auth custom claim `moderator == true`.
-- Per-member block lists plus reciprocal `blockedBy` mirrors; blocked pairs are hidden from friend discovery, messaging, feed, shared profiles, and comments. Feed and directory queries exclude blocked IDs at the query level when the list is within Firestore's 30-value `not-in` limit, with client-side filtering retained as a fallback.
-- A GitHub Actions workflow that runs Firestore Emulator security tests and builds the web app; push-to-main events are configured to deploy Firebase Hosting.
+Implemented web features:
+- Firebase Authentication: email/password registration, login and password reset
+- Firestore member profiles and public profile directory
+- Profile and cover image uploads through Cloudinary
+- Text, photo and video posts, likes and comments
+- Friend discovery, friend requests and friends list
+- One-to-one private messaging
+- Reporting and blocking controls
+- Moderator report queue guarded by the Firebase Auth custom claim `moderator == true`
+- Share links and invitation links
+- Responsive web layout and PWA manifest/icon
 
-A successful web build or Hosting deployment does not establish store readiness or prove live Firestore behavior.
+## Verified production release (2026-11-19)
 
-## Important limitations in the current safety implementation
+The main-branch GitHub Actions deployment run completed successfully:
+- 13 Firestore Emulator security tests passed.
+- Vite production build passed.
+- Firestore Rules API deployment passed.
+- Firebase Hosting live deployment passed.
 
-1. **Blocking is improved but still incomplete.** Firestore rules now deny direct reads of a blocked member's public profile and direct reads of that member's individual post; deny new likes/comments on a post when either party has blocked the other; deny message-history reads when either conversation participant has blocked the other; and continue to prevent blocked pairs from creating/updating friendships, sending messages, or creating conversations. The UI filters the current member's own blocked list from selected discovery, inbox and feed views. Feed, directory, likes and comments collection queries still need careful query-compatible reciprocal enforcement and end-to-end testing; do not claim that every route is hidden or denied.
-2. **Moderation is a starter workflow, not a full operations system.** Reports can be submitted and moderators with a trusted custom claim can review status. The app does not yet provide case assignment, appeals, evidence-retention controls, response-time monitoring, content takedown tools, account suspension, or a documented staffed escalation process. No moderator claim has been provisioned.
-3. **Report coverage must be verified.** Visible report controls now cover feed posts, comments, member profiles including shared-profile pages, and received messages. Every possible content entry point and the live deployed behavior still need a complete review.
-4. **Account deletion is not implemented.** There is no trusted server-side cascade for Firebase Authentication, Firestore relationships/messages/reports, and Cloudinary assets. The account-deletion plan is documented separately. Do not display a delete-account control that implies full deletion.
-5. **Terms acceptance is not implemented.** A clear affirmative acceptance flow for Terms and Community Guidelines must be added before users create user-generated content, with version and acceptance timestamp recorded appropriately.
-6. **Privacy and legal pages are drafts only.** The policy, terms and community guidelines still contain owner decisions and placeholders. They must be verified, completed, legally reviewed where appropriate, published at stable public URLs, and linked inside the app.
-7. **Mobile app packaging is not present.** This repository is a web app, not a signed Android App Bundle or iOS app archive. A mobile strategy, real-device testing, store assets and release pipelines remain necessary.
-8. **Security and abuse controls need review.** Verify Cloudinary unsigned preset restrictions, permitted formats, upload limits, moderation and cleanup. Never put Cloudinary API secrets or Firebase Admin credentials in browser code.
-9. **Automated security tests have limited confirmed coverage.** GitHub Actions completed all thirteen Firestore Emulator regression tests and the application production build successfully on 2026-11-19. The tests cover private-profile creation identity and authenticated-email matching, profile-field authorization and authentication-email immutability, public-profile access, direct-post access, owner-only inbox queries, conversation/message-history denial after blocking, blocked like/comment creation, blocked friend-request/message creation, atomic inbox cleanup, cleanup after a persisted block, report privacy and moderator-only updates, and atomic first-message plus inbox creation. These tests do not cover account lifecycle, invitations, every query path, UI behavior, or production data. A green build is not a substitute for end-to-end testing.
-10. **Operational and store details remain open.** Confirm support contact, publisher/legal name, age rating, target audience, data-safety disclosures, privacy URL, reviewer instructions, retention schedule and moderation response commitments.
+This confirms that the release pipeline completed. It is not a substitute for a complete production end-to-end test across every feature and every account state.
 
-## Required work before submission
+## Remaining safety and operational release blockers
 
-- Complete server-enforced block privacy for feed, directory, likes and comments collection queries, including cases with more than 30 blocked UIDs; test all paths and both block directions before publishing rules.
-- Complete report entry points and moderator procedures; test that ordinary members cannot list or modify other people's reports and cannot grant themselves moderator access.
-- Implement full account deletion in a trusted backend. Require recent authentication, safely process related records and shared data, remove owned Cloudinary assets using server-side credentials, handle legally required report retention, and delete the Firebase Authentication account only after cleanup is safely coordinated.
-- Add explicit, versioned Terms and Community Guidelines acceptance before user-generated content.
-- Finalize and publish accurate Privacy Policy, Terms, Community Guidelines and support/contact pages.
-- Review Cloudinary preset security and media abuse controls.
-- Expand automated Firestore rules and application tests to cover account lifecycle, reports, invitations, query compatibility and authorization boundaries; test on real devices.
-- Create and verify Android/iOS builds, store listing assets, disclosures, age ratings and reviewer instructions.
+### 1. Account deletion — NOT IMPLEMENTED
 
-## Owner decisions and information still required
+A browser-only delete button would be unsafe and incomplete. Complete deletion must coordinate Firebase Authentication, private/public profiles, authored posts and nested comments/likes, comments on other members' posts, reciprocal friendship/block records, shared conversations, report retention, and Cloudinary assets.
 
-Do not guess these details:
-- Public support and moderation email.
-- Legal publisher name.
-- Public policy/support website URL or approved hosting location.
-- Minimum supported age and intended audience.
-- Retention periods and moderation response commitments.
-- Final store account identity and verification details.
+A trusted backend is required to verify identity, perform retryable/idempotent cleanup, remove Cloudinary assets using server-side credentials, and delete the Auth account only after cleanup. Firebase Cloud Functions deployment requires Blaze billing. The owner has not approved a billing upgrade; do not enable billing or deploy a paid backend without explicit approval. See `ACCOUNT_DELETION_PLAN.md`.
 
-## Cost and release constraints
+### 2. Blocking privacy — PARTIALLY IMPLEMENTED
 
-The project owner has confirmed Firebase Spark (free) and has not approved a billing upgrade or paid service. Keep this work on Spark unless the owner explicitly authorizes a cost change. Firebase Cloud Functions deployment requires the Blaze billing plan; do not enable it or attach billing as part of this work.
+Rules deny direct reads of blocked public profiles and individual posts, block new likes/comments on a post after either side blocks the other, deny blocked conversation/message-history reads, and prevent blocked pairs from creating new friend requests, friendships or messages. Client views also filter blocked IDs from selected feed, directory, inbox and comment views.
 
-The safety pull request must remain a draft until the owner reviews it and the remaining release blockers are resolved. Do not merge or deploy this branch as a production release without explicit approval.
+However, Firestore collection-list rules for posts, public profiles, likes and comments do not yet provide complete server-enforced privacy for every query. The client-side `not-in` strategy is limited to 30 values. Do not claim all blocked data is inaccessible through every collection query or for arbitrarily large block lists. A query-compatible data-model redesign and expanded emulator tests are still needed before this can be marked complete.
 
-## Current release decision
+### 3. Moderation — STARTER WORKFLOW ONLY
 
-**NOT READY FOR GOOGLE PLAY OR THE APPLE APP STORE.** The current branch contains useful safety foundations and documentation, but blocking enforcement, full moderation operations, account deletion, legal pages, Terms acceptance, automated security tests and native mobile packaging remain incomplete.
+Users can submit reports; reports are private to their reporter and trusted moderators. The report queue can update status. No moderator claim has been provisioned. A project owner must grant `moderator: true` from a trusted private Admin SDK environment. Never grant it through a user-editable Firestore profile or expose Admin credentials in the browser. See `MODERATOR_SETUP.md`.
 
-## Firestore rules test automation (draft branch)
+A staffed moderation process, case assignment, evidence retention, response targets, appeals, account suspension and takedown tools are not complete. Reports involving private messages need a privacy-reviewed workflow; moderators do not automatically gain general conversation access.
 
-A Firestore Emulator test harness is now included on this review branch:
-- `npm run test:rules` starts the Firestore Emulator and runs Node's built-in test runner.
-- The thirteen automated cases check private-profile creation identity and authenticated-email matching, profile and post access, owner-only inbox queries, reciprocal block enforcement for conversation history and social actions, inbox cleanup, authorization of reciprocal block mirrors, atomic first-message creation, and report privacy and moderator-only report updates. All thirteen passed in completed GitHub Actions run 44498997280.
-- The pull-request workflow runs these rules tests before the production build step.
-- These tests run against the draft `firestore.rules` file only. They do not publish rules to the live Firebase project. The app also repairs missing private profile documents for authenticated legacy accounts using a transaction.
+### 4. Legal pages and acceptance — NOT READY
 
-The latest completed draft-branch CI run with the thirteen-test suite (2026-11-19; run 44498997280) passed all thirteen Firestore Emulator regression tests and the production build. The report test verifies report privacy, rejects forged reporter identity and reporter-side edits, and permits status updates only for a trusted moderator claim. The profile tests verify that members can update permitted profile fields but cannot change the stored authentication email, and that profile creation is limited to the authenticated UID and Firebase Auth token email. Hosting deployment was skipped because this was a pull-request validation run; no production release or Firestore rules publication occurred. The suite remains an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
+Privacy Policy, Terms of Service and Community Guidelines are owner-review drafts, not publishable legal documents. Required owner-supplied details remain unknown:
+- Verified legal publisher name
+- Monitored public support/privacy contact email
+- Effective date and public policy URL
+- Minimum age and intended audience
+- Accurate data retention, deletion and moderation practices
+- Appeals and escalation process
 
+Terms and Community Guidelines acceptance is not yet enforced before members create user-generated content. Do not publish placeholder legal documents or represent that users have accepted terms when the application has not recorded acceptance.
+
+### 5. Mobile stores — NOT READY
+
+The repository contains a web app/PWA only. It does not contain a signed Android App Bundle or iOS archive. Store submission still needs:
+- A chosen and tested native packaging strategy
+- Real-device testing on supported Android and iOS versions
+- Store listing name, descriptions, screenshots, app icon and promotional assets
+- Age rating, target-audience declarations and data-safety/privacy disclosures
+- Stable public policy/support URLs
+- Reviewer notes and test/demo account where required
+- Registered and verified developer accounts
+
+A PWA install option is not the same as native store packaging or store approval.
+
+## Cost and privacy guardrails
+
+The owner has not approved paid billing. Keep Firebase on the existing plan and do not add paid services, attach a payment method, or deploy a paid backend without explicit approval. Never commit Firebase service-account JSON or Cloudinary API secrets. Browser Firebase configuration is not a substitute for server-side credentials.
+
+## Release decision
+
+**The web application has a successful production deployment. FACEBOOM is NOT ready to be described as fully launch-ready for public app stores.** Account deletion, complete query-level block privacy, staffed moderation operations, finalized legal documents and acceptance, and native app packaging remain open.
