@@ -93,7 +93,7 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
     } catch (error) {
       console.error('Block action failed:', error);
       setStatus(blockSaved
-        ? 'The member is blocked, but some inbox entries could not be cleared. Messaging remains blocked; please retry the cleanup later.'
+        ? 'The member is blocked, but some inbox entries could not be cleared. Messaging and conversation access remain blocked.'
         : 'Unable to update your block list. Please try again.');
     } finally {
       setBusy(false);
