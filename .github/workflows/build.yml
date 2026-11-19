@@ -67,7 +67,6 @@ jobs:
             --data-binary "@$rules_payload" | python -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
 
           release_url="$api/$release_name"
-          release_body="$(python -c 'import json,os; print(json.dumps({"release":{"name":os.environ["RELEASE_NAME"],"rulesetName":os.environ["RULESET_NAME"]}}))' )"
           if curl --fail --silent --show-error \
             -H "Authorization: Bearer $access_token" "$release_url" >/dev/null 2>&1; then
             RELEASE_NAME="$release_name" RULESET_NAME="$ruleset_name" \
