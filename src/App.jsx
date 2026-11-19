@@ -172,12 +172,23 @@ function App() {
   useEffect(() => {
     if (!user) return undefined;
     const profileUid = new URLSearchParams(window.location.search).get('profile');
-    if (!profileUid || profileUid === user.uid) {
+    if (!profileUid) {
       setSharedProfile(null);
       setSharedProfileError('');
       return undefined;
     }
+    if (profileUid === user.uid) {
+      setSharedProfile(null);
+      setSharedProfileError('');
+      setShowProfile(true);
+      setShowFriends(false);
+      setShowMessages(false);
+      return undefined;
+    }
 
+    setShowProfile(false);
+    setShowFriends(false);
+    setShowMessages(false);
     let active = true;
     setSharedProfileLoading(true);
     setSharedProfileError('');
@@ -1275,6 +1286,12 @@ function App() {
                   setSharedPostId('');
                   window.history.replaceState({}, '', window.location.pathname);
                 }}>View all posts</button>
+              </div>
+            )}
+
+            {sharedPostId && !feedLoading && posts.length > 0 && !posts.some((item) => item.id === sharedPostId) && (
+              <div style={cardStyle}>
+                <p>This shared post is not available. It may have been deleted or is no longer visible.</p>
               </div>
             )}
 
