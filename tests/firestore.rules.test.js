@@ -285,6 +285,17 @@ test('reports are private to their reporter and moderators, and only moderators 
   await assertFails(getDoc(doc(bobDb, 'reports/report-1')));
   await assertSucceeds(getDoc(doc(moderatorDb, 'reports/report-1')));
 
+  // Reporters can query only their own reports; moderators can review the queue.
+  await assertSucceeds(getDocs(query(
+    collection(aliceDb, 'reports'),
+    where('reporterId', '==', 'alice')
+  )));
+  await assertFails(getDocs(query(
+    collection(bobDb, 'reports'),
+    where('reporterId', '==', 'alice')
+  )));
+  await assertSucceeds(getDocs(query(collection(moderatorDb, 'reports'))));
+
   await assertFails(setDoc(doc(bobDb, 'reports/fake-report'), {
     reporterId: 'alice',
     targetUid: 'bob',
