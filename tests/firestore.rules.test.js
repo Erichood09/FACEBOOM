@@ -211,6 +211,39 @@ test('a block batch can remove both inbox summaries atomically', async () => {
 });
 
 
+
+test('a persisted block allows later cleanup of both inbox summaries', async () => {
+  await seed('conversations/alice_bob', {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const summary = {
+    conversationId: 'alice_bob',
+    participants: ['alice', 'bob'],
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    updatedAt: new Date(),
+  };
+  await seed('users/alice/inbox/alice_bob', { ...summary, otherUid: 'bob' });
+  await seed('users/bob/inbox/alice_bob', { ...summary, otherUid: 'alice' });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(setDoc(doc(aliceDb, 'users/alice/blocked/bob'), {
+    uid: 'bob',
+    createdAt: serverTimestamp(),
+  }));
+
+  const cleanup = writeBatch(aliceDb);
+  cleanup.delete(doc(aliceDb, 'users/alice/inbox/alice_bob'));
+  cleanup.delete(doc(aliceDb, 'users/bob/inbox/alice_bob'));
+  await assertSucceeds(cleanup.commit());
+  await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
+});
+
 test('a first message and both inbox summaries can be created atomically', async () => {
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
   const conversationId = 'alice_bob';
