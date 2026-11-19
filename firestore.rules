@@ -238,13 +238,16 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow create: if signedIn()
         && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.targetUid is string
+        && request.resource.data.contentId is string
         && request.resource.data.contentType in ['post', 'account', 'comment', 'message']
-        && request.resource.data.reason is string
-        && request.resource.data.reason.size() > 0
-        && request.resource.data.reason.size() <= 80
+        && request.resource.data.reason in [
+          'harassment', 'hate', 'violence', 'sexual', 'spam', 'privacy', 'other'
+        ]
         && request.resource.data.details is string
         && request.resource.data.details.size() <= 1000
         && request.resource.data.status == 'open'
+        && request.resource.data.createdAt == request.time
         && request.resource.data.keys().hasOnly([
           'reporterId', 'targetUid', 'contentType', 'contentId',
           'reason', 'details', 'status', 'createdAt'
@@ -253,7 +256,11 @@ service cloud.firestore {
         && (resource.data.reporterId == request.auth.uid || isModerator());
       allow update: if isModerator()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'moderatorNote', 'resolvedAt']);
+          .hasOnly(['status', 'moderatorNote', 'resolvedAt'])
+        && request.resource.data.status in ['open', 'reviewing', 'resolved', 'dismissed']
+        && (!('moderatorNote' in request.resource.data)
+          || (request.resource.data.moderatorNote is string
+            && request.resource.data.moderatorNote.size() <= 1000));
       allow delete: if false;
     }
 
