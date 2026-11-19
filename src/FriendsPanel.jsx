@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
+  documentId,
   deleteDoc,
   doc,
   getDoc,
@@ -91,7 +92,12 @@ export default function FriendsPanel({ user, profile, onBack }) {
     setLoadingPeople(true);
     setError('');
     try {
-      const snapshot = await getDocs(collection(db, 'publicProfiles'));
+      const directory = collection(db, 'publicProfiles');
+      const hiddenIds = [...new Set([...blockedUserIds, ...blockedByUserIds])];
+      const directoryQuery = hiddenIds.length > 0 && hiddenIds.length <= 30
+        ? query(directory, where(documentId(), 'not-in', hiddenIds))
+        : directory;
+      const snapshot = await getDocs(directoryQuery);
       setPeople(snapshot.docs
         .filter((item) => item.id !== user.uid)
         .map((item) => publicProfile(item.data(), item.id)));
@@ -105,9 +111,9 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
   useEffect(() => {
     loadPeople();
-    // Load the directory once when this panel opens.
+    // Refresh directory results when either side of a block relationship changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.uid]);
+  }, [user.uid, blockedUserIds, blockedByUserIds]);
 
   const filteredPeople = useMemo(() => {
     const term = searchText.trim().toLowerCase();
