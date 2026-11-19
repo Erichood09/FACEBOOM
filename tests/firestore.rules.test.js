@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -15,6 +16,7 @@ import {
   setDoc,
   serverTimestamp,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 
 let testEnv;
@@ -46,13 +48,6 @@ test('a member can read a public profile unless either member has blocked the ot
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
   await assertSucceeds(getDoc(doc(aliceDb, 'publicProfiles/bob')));
 
-  // Firestore cannot filter query results using the cross-user block lookup in this list rule.
-  // The current participants-array inbox query must be tested even before any block exists.
-  await assertFails(getDocs(query(
-    collection(aliceDb, 'conversations'),
-    where('participants', 'array-contains', 'alice'),
-  )));
-
   await seed('users/bob/blocked/alice', { uid: 'alice' });
   await assertFails(getDoc(doc(aliceDb, 'publicProfiles/bob')));
 });
@@ -65,6 +60,32 @@ test('a blocked member cannot directly open another member post', async () => {
 
   await seed('users/alice/blocked/bob', { uid: 'bob' });
   await assertFails(getDoc(doc(aliceDb, 'posts/post-1')));
+});
+
+test('the inbox query works from the owner path and is denied to other members', async () => {
+  await seed('conversations/alice_bob', {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await seed('users/alice/inbox/alice_bob', {
+    conversationId: 'alice_bob',
+    participants: ['alice', 'bob'],
+    otherUid: 'bob',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    updatedAt: new Date(),
+  });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertSucceeds(getDocs(collection(aliceDb, 'users', 'alice', 'inbox')));
+  await assertFails(getDocs(collection(bobDb, 'users', 'alice', 'inbox')));
+  await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob')));
+  await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')).catch(() => null));
 });
 
 test('blocking either participant denies conversation and message-history reads', async () => {
@@ -87,22 +108,10 @@ test('blocking either participant denies conversation and message-history reads'
   await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob')));
   await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
 
-  // Firestore cannot filter query results using the cross-user block lookup in this list rule.
-  // Verify the current inbox query before any block exists.
-  await assertFails(getDocs(query(
-    collection(aliceDb, 'conversations'),
-    where('participants', 'array-contains', 'alice'),
-  )));
-
   await seed('users/bob/blocked/alice', { uid: 'alice' });
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
   await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
-  await assertFails(getDocs(query(
-    collection(aliceDb, 'conversations'),
-    where('participants', 'array-contains', 'alice'),
-  )));
 });
-
 
 test('blocking prevents new likes and comments on the other member posts', async () => {
   await seed('posts/post-2', { authorId: 'bob', text: 'Post' });
@@ -166,4 +175,38 @@ test('blocking prevents new friend requests and new messages', async () => {
     senderName: 'Alice',
     createdAt: serverTimestamp(),
   }));
+});
+
+test('a block batch can remove both inbox summaries atomically', async () => {
+  await seed('conversations/alice_bob', {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const aliceInbox = {
+    conversationId: 'alice_bob',
+    participants: ['alice', 'bob'],
+    otherUid: 'bob',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    updatedAt: new Date(),
+  };
+  const bobInbox = { ...aliceInbox, otherUid: 'alice' };
+  await seed('users/alice/inbox/alice_bob', aliceInbox);
+  await seed('users/bob/inbox/alice_bob', bobInbox);
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const batch = writeBatch(aliceDb);
+  batch.set(doc(aliceDb, 'users/alice/blocked/bob'), {
+    uid: 'bob',
+    createdAt: serverTimestamp(),
+  });
+  batch.delete(doc(aliceDb, 'users/alice/inbox/alice_bob'));
+  batch.delete(doc(aliceDb, 'users/bob/inbox/alice_bob'));
+
+  await assertSucceeds(batch.commit());
+  await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
 });
