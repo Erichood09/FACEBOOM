@@ -14,11 +14,13 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from './firebase';
+import SafetyActions from './SafetyActions';
 
 const conversationIdFor = (a, b) => [a, b].sort().join('_');
 
 export default function MessagesPanel({ user, profile, onBack }) {
   const [people, setPeople] = useState([]);
+  const [blockedUserIds, setBlockedUserIds] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -27,6 +29,12 @@ export default function MessagesPanel({ user, profile, onBack }) {
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snap) => {
+      setBlockedUserIds(snap.docs.map((item) => item.id));
+    }, (err) => console.error('Load block list:', err));
+  }, [user.uid]);
 
   useEffect(() => {
     let active = true;
@@ -69,12 +77,13 @@ export default function MessagesPanel({ user, profile, onBack }) {
 
   const filteredPeople = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return people;
-    return people.filter((person) =>
+    const availablePeople = people.filter((person) => !blockedUserIds.includes(person.uid));
+    if (!term) return availablePeople;
+    return availablePeople.filter((person) =>
       `${person.fullName || ''} ${person.username || ''} ${person.country || ''}`
         .toLowerCase().includes(term)
     );
-  }, [people, search]);
+  }, [people, search, blockedUserIds]);
 
   const selectedConversation = selectedPerson
     ? conversations.find((item) => item.id === conversationIdFor(user.uid, selectedPerson.uid))
@@ -201,6 +210,13 @@ export default function MessagesPanel({ user, profile, onBack }) {
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: 10, marginBottom: 12 }}>
                 <strong>{selectedPerson.fullName || 'FACEBOOM Member'}</strong>
                 <div style={{ color: '#666', fontSize: 13 }}>Private conversation</div>
+                <SafetyActions
+                  user={user}
+                  targetUid={selectedPerson.uid}
+                  targetName={selectedPerson.fullName}
+                  contentType="account"
+                  contentId={selectedPerson.uid}
+                />
               </div>
               <div style={{ flex: 1, minHeight: 280, maxHeight: 440, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 9, padding: '4px 2px' }}>
                 {!selectedConversation && <p style={{ color: '#666', textAlign: 'center' }}>This is the start of your conversation. Send a message when you're ready.</p>}
