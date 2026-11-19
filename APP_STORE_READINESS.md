@@ -68,9 +68,9 @@ The safety pull request must remain a draft until the owner reviews it and the r
 
 A Firestore Emulator test harness is now included on this review branch:
 - `npm run test:rules` starts the Firestore Emulator and runs Node's built-in test runner.
-- The current ten automated cases check profile and post access, owner-only inbox queries, reciprocal block enforcement for conversation history and social actions, inbox cleanup, and atomic first-message creation, plus report privacy and moderator-only report updates.
+- The current eleven planned automated cases check profile and post access, owner-only inbox queries, reciprocal block enforcement for conversation history and social actions, inbox cleanup, atomic first-message creation, report privacy and moderator-only report updates, and authentication-email immutability. The eleventh case is awaiting CI.
 - The pull-request workflow runs these rules tests before the production build step.
 - These tests run against the draft `firestore.rules` file only. They do not publish rules to the live Firebase project.
 
-The latest completed draft-branch CI run (2026-11-19) passed all ten Firestore Emulator regression tests and the production build. The tenth test verifies report privacy, rejects forged reporter identity and reporter-side edits, and permits status updates only for a trusted moderator claim. The suite remains an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
+The latest completed draft-branch CI run (2026-11-19) passed ten Firestore Emulator regression tests and the production build. The report test verifies report privacy, rejects forged reporter identity and reporter-side edits, and permits status updates only for a trusted moderator claim. An eleventh test now checks that members can update permitted profile fields but cannot change the stored authentication email; the latest branch commit is awaiting CI. The suite remains an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
 
