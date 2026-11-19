@@ -293,6 +293,35 @@ test('a persisted block allows later cleanup of both inbox summaries', async () 
 });
 
 
+test('block mirrors are visible only to the blocked member and cannot be forged', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const batch = writeBatch(aliceDb);
+  batch.set(doc(aliceDb, 'users/alice/blocked/bob'), {
+    uid: 'bob',
+    createdAt: serverTimestamp(),
+  });
+  batch.set(doc(aliceDb, 'users/bob/blockedBy/alice'), {
+    uid: 'alice',
+    createdAt: serverTimestamp(),
+  });
+  await assertSucceeds(batch.commit());
+
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertSucceeds(getDoc(doc(bobDb, 'users/bob/blockedBy/alice')));
+  await assertFails(getDoc(doc(aliceDb, 'users/bob/blockedBy/alice')));
+
+  const malloryDb = testEnv.authenticatedContext('mallory').firestore();
+  await assertFails(setDoc(doc(malloryDb, 'users/bob/blockedBy/alice'), {
+    uid: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+
+  const unblock = writeBatch(aliceDb);
+  unblock.delete(doc(aliceDb, 'users/alice/blocked/bob'));
+  unblock.delete(doc(aliceDb, 'users/bob/blockedBy/alice'));
+  await assertSucceeds(unblock.commit());
+});
+
 test('reports are private to their reporter and moderators, and only moderators can update them', async () => {
   await seed('reports/report-1', {
     reporterId: 'alice',
