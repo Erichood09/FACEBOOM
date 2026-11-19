@@ -150,7 +150,10 @@ service cloud.firestore {
         allow create: if ownsUser(userId)
           && blockedUid != userId
           && request.resource.data.uid == blockedUid
-          && request.resource.data.keys().hasOnly(['uid', 'createdAt']);
+          && request.resource.data.keys().hasOnly(['uid', 'fullName', 'createdAt'])
+          && (!('fullName' in request.resource.data)
+            || (request.resource.data.fullName is string
+              && request.resource.data.fullName.size() <= 120));
         allow update: if false;
         allow delete: if ownsUser(userId);
       }
