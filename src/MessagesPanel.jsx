@@ -225,6 +225,15 @@ export default function MessagesPanel({ user, profile, onBack }) {
                   return <div key={message.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%', background: mine ? '#e7f1ff' : '#f1f3f5', padding: '9px 12px', borderRadius: 12, overflowWrap: 'anywhere' }}>
                     <div style={{ fontSize: 11, color: '#666', marginBottom: 3 }}>{mine ? 'You' : (message.senderName || selectedPerson.fullName)}</div>
                     <div style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
+                    {!mine && (
+                      <SafetyActions
+                        user={user}
+                        targetUid={message.senderId}
+                        targetName={message.senderName || selectedPerson.fullName}
+                        contentType="message"
+                        contentId={message.id}
+                      />
+                    )}
                   </div>;
                 })}
               </div>
