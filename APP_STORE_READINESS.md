@@ -72,5 +72,5 @@ A Firestore Emulator test harness is now included on this review branch:
 - The pull-request workflow runs these rules tests before the production build step.
 - These tests run against the draft `firestore.rules` file only. They do not publish rules to the live Firebase project.
 
-The latest completed draft-branch CI run passed the nine then-current Firestore Emulator regression tests and the production build. A tenth report-authorization regression test has since been added and is awaiting its CI result. The suite is still an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
+The latest completed draft-branch CI run (2026-11-19) passed all ten Firestore Emulator regression tests and the production build. The tenth test verifies report privacy, rejects forged reporter identity and reporter-side edits, and permits status updates only for a trusted moderator claim. The suite remains an initial security regression baseline, not complete coverage of every collection, query, friendship transition, moderator action, or client workflow. Expand it and test query compatibility before publishing any revised rules.
 
