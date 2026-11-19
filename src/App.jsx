@@ -28,7 +28,8 @@ import {
   orderBy,
   onSnapshot,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  runTransaction
 } from 'firebase/firestore';
 
 function App() {
@@ -151,6 +152,20 @@ function App() {
             photoURL: '',
             coverPhotoURL: ''
           };
+
+          // Repair older authenticated accounts that do not yet have a private
+          // profile document. A transaction avoids racing the registration flow.
+          await runTransaction(db, async (transaction) => {
+            const currentProfile = await transaction.get(profileRef);
+            if (!currentProfile.exists()) {
+              transaction.set(profileRef, {
+                ...loadedProfile,
+                email: user.email,
+                accountStatus: 'active',
+                createdAt: new Date().toISOString()
+              });
+            }
+          });
         }
 
         setProfile(loadedProfile);
