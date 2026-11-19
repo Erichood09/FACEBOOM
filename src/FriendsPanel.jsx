@@ -33,6 +33,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
   const [outgoing, setOutgoing] = useState([]);
   const [friends, setFriends] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
+  const [blockedPeople, setBlockedPeople] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
@@ -108,10 +109,32 @@ export default function FriendsPanel({ user, profile, onBack }) {
     );
   }, [people, searchText, blockedUserIds]);
 
-  const blockedPeople = useMemo(
-    () => people.filter((person) => blockedUserIds.includes(person.uid)),
-    [people, blockedUserIds]
-  );
+  useEffect(() => {
+    let active = true;
+
+    async function loadBlockedPeople() {
+      if (blockedUserIds.length === 0) {
+        setBlockedPeople([]);
+        return;
+      }
+
+      try {
+        const profiles = await Promise.all(blockedUserIds.map(async (uid) => {
+          const snapshot = await getDoc(doc(db, 'publicProfiles', uid));
+          return snapshot.exists()
+            ? publicProfile(snapshot.data(), uid)
+            : { uid, fullName: 'FACEBOOM Member', username: '', country: '', bio: '', photoURL: '', coverPhotoURL: '' };
+        }));
+        if (active) setBlockedPeople(profiles);
+      } catch (err) {
+        console.error('Load blocked member profiles:', err);
+        if (active) setError('Unable to load blocked member details. You can still unblock members from this list.');
+      }
+    }
+
+    loadBlockedPeople();
+    return () => { active = false; };
+  }, [blockedUserIds]);
 
   function isFriend(uid) {
     return friends.some((friend) => friend.uid === uid || friend.id === uid);
