@@ -1,0 +1,89 @@
+import { readFileSync } from 'node:fs';
+import { after, before, beforeEach, test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  initializeTestEnvironment,
+  assertSucceeds,
+  assertFails,
+} from '@firebase/rules-unit-testing';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
+
+let testEnv;
+
+before(async () => {
+  testEnv = await initializeTestEnvironment({
+    projectId: 'demo-faceboom',
+    firestore: { rules: readFileSync('firestore.rules', 'utf8') },
+  });
+});
+
+beforeEach(async () => {
+  await testEnv.clearFirestore();
+});
+
+after(async () => {
+  await testEnv.cleanup();
+});
+
+async function seed(path, data) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), path), data);
+  });
+}
+
+test('a member can read a public profile unless either member has blocked the other', async () => {
+  await seed('publicProfiles/bob', { uid: 'bob', fullName: 'Bob' });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(getDoc(doc(aliceDb, 'publicProfiles/bob')));
+
+  await seed('users/bob/blocked/alice', { uid: 'alice' });
+  await assertFails(getDoc(doc(aliceDb, 'publicProfiles/bob')));
+});
+
+test('a blocked member cannot directly open another member post', async () => {
+  await seed('posts/post-1', { authorId: 'bob', text: 'Hello' });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(getDoc(doc(aliceDb, 'posts/post-1')));
+
+  await seed('users/alice/blocked/bob', { uid: 'bob' });
+  await assertFails(getDoc(doc(aliceDb, 'posts/post-1')));
+});
+
+test('blocking either participant denies conversation and message-history reads', async () => {
+  await seed('conversations/alice_bob', {
+    participants: ['alice', 'bob'],
+    createdBy: 'alice',
+    lastMessage: 'Hello',
+    lastSenderId: 'alice',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await seed('conversations/alice_bob/messages/message-1', {
+    text: 'Hello',
+    senderId: 'alice',
+    senderName: 'Alice',
+    createdAt: new Date(),
+  });
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob')));
+  await assertSucceeds(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
+
+  await seed('users/bob/blocked/alice', { uid: 'alice' });
+  await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob')));
+  await assertFails(getDoc(doc(aliceDb, 'conversations/alice_bob/messages/message-1')));
+  await assertFails(getDocs(query(
+    collection(aliceDb, 'conversations'),
+    where('participants', 'array-contains', 'alice'),
+  )));
+});
