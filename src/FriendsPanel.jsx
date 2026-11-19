@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import SafetyActions from './SafetyActions';
+import ShareActions from './ShareActions';
 
 const publicProfile = (data, uid) => ({
   uid,
@@ -298,6 +299,13 @@ export default function FriendsPanel({ user, profile, onBack }) {
           {person.username && <span>@{person.username}</span>}
           {person.country && <small>{person.country}</small>}
           {person.bio && <p>{person.bio}</p>}
+        </div>
+        <div style={{ width: '100%', paddingLeft: 67 }}>
+          <ShareActions
+            title={`${person.fullName || 'FACEBOOM Member'} on FACEBOOM`}
+            text={`Connect with ${person.fullName || 'this member'} on FACEBOOM.`}
+            url={`${window.location.origin}${window.location.pathname}?profile=${person.uid}`}
+          />
         </div>
         <div className="fb-person-actions">
           <SafetyActions
