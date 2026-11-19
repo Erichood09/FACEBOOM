@@ -32,7 +32,7 @@ import {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
+  const [registering, setRegistering] = useState(() => Boolean(new URLSearchParams(window.location.search).get('invite')));
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -810,6 +810,12 @@ function App() {
           <h1 style={{ color: '#1877f2' }}>FACEBOOM</h1>
 
           <p>Connect with friends and the world around you.</p>
+
+          {new URLSearchParams(window.location.search).get('invite') && (
+            <p style={{ background: '#eef5ff', borderRadius: 8, padding: 12, color: '#174ea6' }}>
+              You have been invited to join FACEBOOM. Create your free account to connect with friends.
+            </p>
+          )}
 
           <h2>{registering ? 'Create Your Account' : 'Welcome Back'}</h2>
 
