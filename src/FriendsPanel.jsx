@@ -161,6 +161,11 @@ export default function FriendsPanel({ user, profile, onBack }) {
     return () => { active = false; };
   }, [blockedUserIds]);
 
+  const visibleFriends = friends.filter((friend) =>
+    !blockedUserIds.includes(friend.uid || friend.id)
+    && !blockedByUserIds.includes(friend.uid || friend.id)
+  );
+
   function isFriend(uid) {
     return friends.some((friend) => friend.uid === uid || friend.id === uid);
   }
@@ -381,7 +386,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
           Requests {incoming.length > 0 && <span className="fb-count">{incoming.length}</span>}
         </button>
         <button className={activeTab === 'friends' ? 'active' : ''} onClick={() => setActiveTab('friends')}>
-          My Friends ({friends.length})
+          My Friends ({visibleFriends.length})
         </button>
         <button className={activeTab === 'blocked' ? 'active' : ''} onClick={() => setActiveTab('blocked')}>
           Blocked ({blockedUserIds.length})
@@ -451,7 +456,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
 
       {activeTab === 'friends' && (
         <div className="fb-people-list">
-          {friends.filter((friend) => !blockedUserIds.includes(friend.uid || friend.id) && !blockedByUserIds.includes(friend.uid || friend.id)).map((friend) => (
+          {visibleFriends.map((friend) => (
             <div className="fb-person-card" key={friend.uid || friend.id}>
               {friend.photoURL ? (
                 <img className="fb-person-avatar" src={friend.photoURL} alt="" />
