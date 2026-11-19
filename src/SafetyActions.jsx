@@ -59,22 +59,33 @@ export default function SafetyActions({ user, targetUid, targetName, contentType
         await deleteDoc(blockRef);
         setStatus('This member has been unblocked. The old conversation will stay out of the inbox until a new message is sent.');
       } else {
+        // Save the block first so messaging and conversation reads are denied
+        // immediately, even if inbox cleanup needs several batches.
+        await setDoc(blockRef, {
+          uid: targetUid,
+          createdAt: serverTimestamp()
+        });
+
         const inboxQuery = query(
           collection(db, 'users', user.uid, 'inbox'),
           where('otherUid', '==', targetUid)
         );
         const inboxSnap = await getDocs(inboxQuery);
-        const batch = writeBatch(db);
-        batch.set(blockRef, {
-          uid: targetUid,
-          createdAt: serverTimestamp()
-        });
-        inboxSnap.docs.forEach((item) => {
-          const conversationId = item.id;
-          batch.delete(doc(db, 'users', user.uid, 'inbox', conversationId));
-          batch.delete(doc(db, 'users', targetUid, 'inbox', conversationId));
-        });
-        await batch.commit();
+        const conversations = inboxSnap.docs;
+
+        // Firestore batches allow at most 500 writes. Delete two inbox
+        // summaries per conversation in smaller sequential batches.
+        for (let offset = 0; offset < conversations.length; offset += 200) {
+          const batch = writeBatch(db);
+          const chunk = conversations.slice(offset, offset + 200);
+          chunk.forEach((item) => {
+            const conversationId = item.id;
+            batch.delete(doc(db, 'users', user.uid, 'inbox', conversationId));
+            batch.delete(doc(db, 'users', targetUid, 'inbox', conversationId));
+          });
+          await batch.commit();
+        }
+
         setStatus('This member has been blocked and the conversation removed from both inboxes.');
       }
     } catch (error) {
