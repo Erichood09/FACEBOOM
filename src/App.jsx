@@ -3,6 +3,7 @@ import './App.css';
 import FriendsPanel from './FriendsPanel';
 import MessagesPanel from './MessagesPanel';
 import SafetyActions from './SafetyActions';
+import ShareActions from './ShareActions';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -61,6 +62,10 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const [sharedProfile, setSharedProfile] = useState(null);
+  const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
+  const [sharedProfileError, setSharedProfileError] = useState('');
+  const [sharedPostId, setSharedPostId] = useState(() => new URLSearchParams(window.location.search).get('post') || '');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
 
@@ -161,6 +166,40 @@ function App() {
     return onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snapshot) => {
       setBlockedUserIds(snapshot.docs.map((item) => item.id));
     }, (err) => console.error('Block list error:', err));
+  }, [user]);
+
+  // OPEN A SHARED PUBLIC PROFILE LINK
+  useEffect(() => {
+    if (!user) return undefined;
+    const profileUid = new URLSearchParams(window.location.search).get('profile');
+    if (!profileUid || profileUid === user.uid) {
+      setSharedProfile(null);
+      setSharedProfileError('');
+      return undefined;
+    }
+
+    let active = true;
+    setSharedProfileLoading(true);
+    setSharedProfileError('');
+    getDoc(doc(db, 'publicProfiles', profileUid))
+      .then((snapshot) => {
+        if (!active) return;
+        if (snapshot.exists()) {
+          setSharedProfile({ uid: profileUid, ...snapshot.data() });
+        } else {
+          setSharedProfile(null);
+          setSharedProfileError('This profile is not available.');
+        }
+      })
+      .catch((err) => {
+        console.error('Load shared profile:', err);
+        if (active) setSharedProfileError('Unable to open this profile right now.');
+      })
+      .finally(() => {
+        if (active) setSharedProfileLoading(false);
+      });
+
+    return () => { active = false; };
   }, [user]);
 
   // LOAD NEWS FEED
@@ -379,6 +418,7 @@ function App() {
 
         await setDoc(doc(db, 'users', result.user.uid), {
           ...newProfile,
+          invitedBy: new URLSearchParams(window.location.search).get('invite') || '',
           email: email.trim(),
           accountStatus: 'active',
           createdAt: new Date().toISOString()
@@ -911,7 +951,44 @@ function App() {
 
       <main style={mainStyle}>
 
-        {showMessages ? (
+        {sharedProfileLoading ? (
+          <div style={cardStyle}><p>Opening shared profile...</p></div>
+        ) : sharedProfileError ? (
+          <div style={cardStyle}>
+            <p style={errorStyle}>{sharedProfileError}</p>
+            <button style={primaryButtonStyle} onClick={() => {
+              setSharedProfileError('');
+              window.history.replaceState({}, '', window.location.pathname);
+            }}>Back to FACEBOOM</button>
+          </div>
+        ) : sharedProfile ? (
+          <div style={cardStyle}>
+            <button style={cancelButtonStyle} onClick={() => {
+              setSharedProfile(null);
+              window.history.replaceState({}, '', window.location.pathname);
+            }}>Back to FACEBOOM</button>
+            <div style={{ ...coverPhotoStyle, backgroundImage: `url(${sharedProfile.coverPhotoURL || ''})` }}>
+              {!sharedProfile.coverPhotoURL && <span style={coverPlaceholderStyle}>FACEBOOM cover photo</span>}
+            </div>
+            {sharedProfile.photoURL ? (
+              <img src={sharedProfile.photoURL} alt="Profile" style={profileImageStyle} />
+            ) : (
+              <div style={avatarStyle}>{(sharedProfile.fullName || 'F').charAt(0).toUpperCase()}</div>
+            )}
+            <h2>{sharedProfile.fullName || 'FACEBOOM Member'}</h2>
+            <p style={{ color: '#1877f2' }}>@{sharedProfile.username || 'member'}</p>
+            {sharedProfile.country && <p><strong>Country:</strong> {sharedProfile.country}</p>}
+            <div style={bioStyle}>
+              <strong>About Me</strong>
+              <p>{sharedProfile.bio || 'This member has not added a biography.'}</p>
+            </div>
+            <ShareActions
+              title={`${sharedProfile.fullName || 'FACEBOOM Member'} on FACEBOOM`}
+              text={`Connect with ${sharedProfile.fullName || 'this member'} on FACEBOOM.`}
+              url={`${window.location.origin}${window.location.pathname}?profile=${sharedProfile.uid}`}
+            />
+          </div>
+        ) : showMessages ? (
           <MessagesPanel
             user={user}
             profile={profile}
@@ -1079,6 +1156,23 @@ function App() {
                     >
                       Edit Profile
                     </button>
+                    <div style={{ marginTop: 14 }}>
+                      <h3 style={{ marginBottom: 8 }}>Share your profile</h3>
+                      <ShareActions
+                        title={`${profile.fullName || 'A FACEBOOM member'} on FACEBOOM`}
+                        text={`Connect with ${profile.fullName || 'me'} on FACEBOOM.`}
+                        url={`${window.location.origin}${window.location.pathname}?profile=${user.uid}`}
+                      />
+                    </div>
+                    <div style={{ marginTop: 18 }}>
+                      <h3 style={{ marginBottom: 8 }}>Invite friends to FACEBOOM</h3>
+                      <p style={{ marginBottom: 8, color: '#606770' }}>Share your personal invitation link with friends.</p>
+                      <ShareActions
+                        title="Join me on FACEBOOM"
+                        text={`Join me on FACEBOOM and connect with friends. Sign up using my invitation link.`}
+                        url={`${window.location.origin}${window.location.pathname}?invite=${user.uid}`}
+                      />
+                    </div>
                   </>
                 )}
 
@@ -1174,6 +1268,16 @@ function App() {
               <p style={errorStyle}>{feedError}</p>
             )}
 
+            {sharedPostId && (
+              <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <strong>You are viewing a shared post.</strong>
+                <button style={cancelButtonStyle} onClick={() => {
+                  setSharedPostId('');
+                  window.history.replaceState({}, '', window.location.pathname);
+                }}>View all posts</button>
+              </div>
+            )}
+
             {feedLoading && <p>Loading posts...</p>}
 
             {!feedLoading && posts.length === 0 && (
@@ -1182,7 +1286,7 @@ function App() {
               </div>
             )}
 
-            {posts.filter((item) => !blockedUserIds.includes(item.authorId)).map((item) => {
+            {posts.filter((item) => !blockedUserIds.includes(item.authorId) && (!sharedPostId || item.id === sharedPostId)).map((item) => {
               const likes = postLikes[item.id] || {
                 count: 0,
                 likedByMe: false
@@ -1241,6 +1345,12 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  <ShareActions
+                    title={`FACEBOOM post by ${item.authorName || 'a member'}`}
+                    text={item.text || 'See this photo or video on FACEBOOM.'}
+                    url={`${window.location.origin}${window.location.pathname}?post=${item.id}`}
+                  />
 
                   <hr style={dividerStyle} />
 
