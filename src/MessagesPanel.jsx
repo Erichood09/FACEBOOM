@@ -39,9 +39,25 @@ export default function MessagesPanel({ user, profile, onBack }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snap) => {
-    setBlockedUserIds(snap.docs.map((item) => item.id));
-  }, (err) => console.error('Load block list:', err)), [user.uid]);
+  useEffect(() => {
+    let ownBlocks = [];
+    let incomingBlocks = [];
+    const updateHiddenMembers = () => {
+      setBlockedUserIds([...new Set([...ownBlocks, ...incomingBlocks])]);
+    };
+    const unsubscribeOwn = onSnapshot(collection(db, 'users', user.uid, 'blocked'), (snap) => {
+      ownBlocks = snap.docs.map((item) => item.id);
+      updateHiddenMembers();
+    }, (err) => console.error('Load block list:', err));
+    const unsubscribeIncoming = onSnapshot(collection(db, 'users', user.uid, 'blockedBy'), (snap) => {
+      incomingBlocks = snap.docs.map((item) => item.id);
+      updateHiddenMembers();
+    }, (err) => console.error('Load incoming block list:', err));
+    return () => {
+      unsubscribeOwn();
+      unsubscribeIncoming();
+    };
+  }, [user.uid]);
 
   useEffect(() => {
     let active = true;
