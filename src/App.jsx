@@ -29,7 +29,8 @@ import {
   onSnapshot,
   deleteDoc,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  where
 } from 'firebase/firestore';
 
 function App() {
@@ -278,10 +279,12 @@ function App() {
     setFeedLoading(true);
     setFeedError('');
 
-    const postsQuery = query(
-      collection(db, 'posts'),
-      orderBy('createdAt', 'desc')
-    );
+    const postsCollection = collection(db, 'posts');
+    // Firestore supports at most 30 values in a not-in filter. For typical
+    // block-list sizes, exclude blocked pairs before post data reaches the UI.
+    const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+      ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
+      : query(postsCollection, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       postsQuery,
@@ -289,7 +292,12 @@ function App() {
         const loadedPosts = snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data()
-        }));
+        })).sort((a, b) => {
+          const time = (value) => value?.toMillis
+            ? value.toMillis()
+            : new Date(value || 0).getTime();
+          return time(b.createdAt) - time(a.createdAt);
+        });
 
         setPosts(loadedPosts);
         setFeedLoading(false);
@@ -302,7 +310,7 @@ function App() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, blockedUserIds]);
 
   // LOAD LIKES
   useEffect(() => {
