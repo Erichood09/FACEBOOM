@@ -19,6 +19,7 @@ export default function LivePanel({ user, profile, onBack }) {
   const [room, setRoom] = useState(null);
   const videoHostRef = useRef(null);
   const [mediaTracks, setMediaTracks] = useState([]);
+  const liveReady = Boolean(tokenEndpoint && livekitUrl);
 
   useEffect(() => {
     const liveQuery = query(collection(db, 'liveStreams'), where('status', '==', 'live'));
@@ -188,6 +189,7 @@ export default function LivePanel({ user, profile, onBack }) {
         <div><h2 style={{ color: '#1877f2', margin: 0 }}>🔴 FACEBOOM Live</h2><p style={{ color: '#687684', margin: '5px 0 0' }}>Broadcast live and watch other members.</p></div>
         <button type="button" style={muted} onClick={onBack}>Back to Home</button>
       </div>
+      {!liveReady && <p role="status" style={{ color: '#7a4b00', background: '#fff7e6', border: '1px solid #f0d28a', padding: 12, borderRadius: 8 }}>Live video is not connected yet. The LiveKit and secure token service setup must be completed before members can start or watch broadcasts.</p>}
       {error && <p role="alert" style={{ color: '#b42318', background: '#fff1f0', padding: 10, borderRadius: 8 }}>{error}</p>}
       {status && <p role="status" style={{ color: '#187a3d' }}>{status}</p>}
       {activeStream ? (
@@ -215,12 +217,12 @@ export default function LivePanel({ user, profile, onBack }) {
           <form onSubmit={startBroadcast} style={card}>
             <h3>Start your live video</h3>
             <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder="Give your live broadcast a title" required style={{ width: '100%', padding: 12, margin: '12px 0', border: '1px solid #ccd2d8', borderRadius: 8 }} />
-            <button type="submit" style={button} disabled={busy}>{busy ? 'Connecting...' : '🔴 Go Live'}</button>
+            <button type="submit" style={button} disabled={busy || !liveReady}>{busy ? 'Connecting...' : '🔴 Go Live'}</button>
             <p style={{ color: '#687684', fontSize: 13, marginTop: 10 }}>Your browser will ask for camera and microphone permission.</p>
           </form>
           <div style={card}>
             <h3>Members Live Now</h3>
-            {streams.length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.filter((stream) => stream.hostUid !== user.uid).map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
+            {streams.length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.filter((stream) => stream.hostUid !== user.uid).map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy || !liveReady} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
           </div>
         </>
       )}
