@@ -237,6 +237,33 @@ function App() {
     loadProfile();
   }, [user]);
 
+  // Keep account restrictions synchronized while the member is signed in.
+  // This lets a moderator suspension or reinstatement take effect in the open app.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      const status = data.accountStatus || 'active';
+      const until = data.suspensionUntil?.toDate ? data.suspensionUntil.toDate() : null;
+      const restricted = status === 'banned'
+        || (status === 'suspended' && (!until || until.getTime() > Date.now()));
+      setAccountRestriction(restricted ? {
+        status,
+        reason: data.moderationReason || '',
+        until
+      } : null);
+    }, (err) => console.warn('Live account status listener:', err));
+  }, [user]);
+
+  // Display new warnings as soon as a moderator records them.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, 'moderationAccounts', user.uid), (snapshot) => {
+      setWarningNotice(snapshot.exists() ? snapshot.data().latestWarning || '' : '');
+    }, (err) => console.warn('Moderation notice listener:', err));
+  }, [user]);
+
   // LOAD THE CURRENT MEMBER'S BLOCK LIST
   useEffect(() => {
     if (!user) {
