@@ -109,7 +109,12 @@ export default function LivePanel({ user, profile, onBack }) {
     nextRoom.on(RoomEvent.TrackUnsubscribed, (track) => setMediaTracks((all) => all.filter((item) => item !== track)));
     nextRoom.on(RoomEvent.ParticipantConnected, () => updateParticipants(nextRoom));
     nextRoom.on(RoomEvent.ParticipantDisconnected, () => updateParticipants(nextRoom));
-    nextRoom.on(RoomEvent.Disconnected, () => { setMediaTracks([]); setParticipantCount(1); });
+    nextRoom.on(RoomEvent.Disconnected, () => {
+      setMediaTracks([]);
+      setParticipantCount(1);
+      setActiveStream(null);
+      setRoom(null);
+    });
     try {
       await nextRoom.connect(livekitUrl, payload.token);
       if (mode === 'host') {
