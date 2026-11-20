@@ -511,16 +511,22 @@ service cloud.firestore {
         && request.resource.data.hostName is string
         && request.resource.data.hostName.size() <= 120
         && request.resource.data.createdAt == request.time
+        && request.resource.data.lastHeartbeat == request.time
         && request.resource.data.keys().hasOnly([
-          'hostUid', 'hostName', 'title', 'status', 'createdAt'
+          'hostUid', 'hostName', 'title', 'status', 'createdAt', 'lastHeartbeat'
         ]);
       allow update: if activeMember()
-        && streamId == request.auth.uid
         && resource.data.hostUid == request.auth.uid
         && resource.data.status == 'live'
-        && request.resource.data.status == 'ended'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
-        && request.resource.data.endedAt == request.time;
+        && (
+          (request.resource.data.status == 'ended'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
+            && request.resource.data.endedAt == request.time)
+          ||
+          (request.resource.data.status == 'live'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastHeartbeat'])
+            && request.resource.data.lastHeartbeat == request.time)
+        );
       allow delete: if false;
 
       match /comments/{commentId} {
