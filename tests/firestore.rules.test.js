@@ -548,6 +548,13 @@ test('active members can join live streams, comment while live, and only the hos
     createdAt: serverTimestamp(),
   }));
 
+  await assertSucceeds(updateDoc(doc(aliceDb, 'liveStreams/live-alice'), {
+    lastHeartbeat: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(bobDb, 'liveStreams/live-alice'), {
+    lastHeartbeat: serverTimestamp(),
+  }));
+
   await assertFails(updateDoc(doc(bobDb, 'liveStreams/live-alice'), {
     status: 'ended',
     endedAt: serverTimestamp(),
