@@ -11,7 +11,7 @@ This feature uses LiveKit Cloud for WebRTC media and a Cloudflare Worker for sho
    - `npx wrangler secret put LIVEKIT_API_KEY`
    - `npx wrangler secret put LIVEKIT_API_SECRET`
 5. Deploy the Worker with `npx wrangler deploy`. Its public URL becomes `VITE_LIVEKIT_TOKEN_URL`.
-6. Add the two Vite variables shown in `.env.live.example` to the Firebase Hosting build environment:
+6. In GitHub, open **Settings → Secrets and variables → Actions → Variables** and add the two public build variables shown in `.env.live.example`:
    - `VITE_LIVEKIT_TOKEN_URL`: deployed Worker URL
    - `VITE_LIVEKIT_WS_URL`: LiveKit WebSocket URL (starts with `wss://`)
 7. Rebuild and deploy FACEBOOM.
