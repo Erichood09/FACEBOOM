@@ -44,12 +44,11 @@ Rules deny direct reads of blocked public profiles and individual posts, block n
 
 However, Firestore collection-list rules for posts, public profiles, likes and comments do not yet provide complete server-enforced privacy for every query. The client-side `not-in` strategy is limited to 30 values. Do not claim all blocked data is inaccessible through every collection query or for arbitrarily large block lists. A query-compatible data-model redesign and expanded emulator tests are still needed before this can be marked complete.
 
-### 3. Moderation — STARTER WORKFLOW ONLY
+### 3. Moderation — CORE ACCOUNT ENFORCEMENT IMPLEMENTED; OPERATIONS STILL REQUIRED
 
-Users can submit reports; reports are private to their reporter and trusted moderators. The report queue can update status. No moderator claim has been provisioned. A project owner must grant `moderator: true` from a trusted private Admin SDK environment. Never grant it through a user-editable Firestore profile or expose Admin credentials in the browser. See `MODERATOR_SETUP.md`.
+Users can submit reports; reports are private to their reporter and trusted moderators. The moderator panel supports report status updates, reasoned warnings, 24-hour/7-day/30-day suspensions, permanent bans, reinstatement, member appeals and append-only action history. Firestore Security Rules enforce account status across the main member operations, and timed suspensions expire automatically. A trusted moderator claim has been provisioned for the project; see `MODERATOR_SETUP.md` for secure administration details.
 
-A staffed moderation process, case assignment, evidence retention, response targets, appeals, account suspension and takedown tools are not complete. Reports involving private messages need a privacy-reviewed workflow; moderators do not automatically gain general conversation access.
-
+Remaining work includes staffed moderation coverage, case assignment, response targets, content takedown and Cloudinary media removal, email/push notifications, and a privacy-reviewed process for reports involving private messages. Moderators do not receive general access to private conversation contents. A suspension or ban does not delete the Firebase Authentication identity or existing posts/media.
 ### 4. Legal pages and acceptance — NOT READY
 
 Privacy Policy, Terms of Service and Community Guidelines are owner-review drafts, not publishable legal documents. Required owner-supplied details remain unknown:
