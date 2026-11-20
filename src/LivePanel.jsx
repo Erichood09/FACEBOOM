@@ -109,8 +109,9 @@ export default function LivePanel({ user, profile, onBack }) {
     event.preventDefault();
     if (!title.trim() || busy) return;
     setBusy(true); setError(''); setStatus('');
+    let streamRef = null;
     try {
-      const streamRef = doc(collection(db, 'liveStreams'));
+      streamRef = doc(collection(db, 'liveStreams'));
       const stream = { id: streamRef.id, hostUid: user.uid, hostName: profile.fullName || user.displayName || 'FACEBOOM member', title: title.trim(), status: 'live' };
       await setDoc(streamRef, {
         hostUid: stream.hostUid, hostName: stream.hostName, title: stream.title,
@@ -121,7 +122,7 @@ export default function LivePanel({ user, profile, onBack }) {
       setStatus('You are live. Keep this page open while broadcasting.');
     } catch (err) {
       console.error('Start broadcast:', err);
-      if (typeof streamRef !== 'undefined') await updateDoc(streamRef, { status: 'ended', endedAt: serverTimestamp() }).catch(() => {});
+      if (streamRef) await updateDoc(streamRef, { status: 'ended', endedAt: serverTimestamp() }).catch(() => {});
       setError(err.message || 'Could not start your broadcast.');
     } finally { setBusy(false); }
   }
