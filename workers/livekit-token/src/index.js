@@ -55,7 +55,7 @@ export default {
       const hostUid = streamDocument.fields?.hostUid?.stringValue;
       if (streamStatus !== 'live') return json({ error: 'This broadcast has ended.' }, 410, origin);
       const isHost = uid === hostUid;
-      if ((mode === 'host' && (!isHost || streamId !== uid)) || (mode === 'viewer' && isHost)) {
+      if ((mode === 'host' && !isHost) || (mode === 'viewer' && isHost)) {
         return json({ error: 'You are not authorized for this live session.' }, 403, origin);
       }
 
