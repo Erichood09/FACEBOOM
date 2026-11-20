@@ -58,7 +58,10 @@ export default {
       const streamDocument = await streamResponse.json();
       const streamStatus = streamDocument.fields?.status?.stringValue;
       const hostUid = streamDocument.fields?.hostUid?.stringValue;
-      if (streamStatus !== 'live') return json({ error: 'This broadcast has ended.' }, 410, origin);
+      const lastHeartbeat = streamDocument.fields?.lastHeartbeat?.timestampValue || '';
+      if (streamStatus !== 'live' || !lastHeartbeat || Date.now() - Date.parse(lastHeartbeat) > 90000) {
+        return json({ error: 'This broadcast is no longer active.' }, 410, origin);
+      }
       const isHost = uid === hostUid;
       if ((mode === 'host' && !isHost) || (mode === 'viewer' && isHost)) {
         return json({ error: 'You are not authorized for this live session.' }, 403, origin);
