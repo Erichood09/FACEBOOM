@@ -520,3 +520,52 @@ test('suspended members can submit private appeals but active members cannot', a
     createdAt: serverTimestamp(),
   }));
 });
+
+
+test('active members can join live streams, comment while live, and only the host can end a broadcast', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'liveStreams/live-alice'), {
+    hostUid: 'alice',
+    hostName: 'Alice',
+    title: 'Community update',
+    status: 'live',
+    createdAt: serverTimestamp(),
+    lastHeartbeat: serverTimestamp(),
+  }));
+
+  await assertSucceeds(getDoc(doc(bobDb, 'liveStreams/live-alice')));
+  await assertSucceeds(getDocs(query(
+    collection(bobDb, 'liveStreams'),
+    where('status', '==', 'live')
+  )));
+
+  await assertSucceeds(setDoc(doc(bobDb, 'liveStreams/live-alice/comments/comment-1'), {
+    senderId: 'bob',
+    senderName: 'Bob',
+    text: 'Hello everyone!',
+    createdAt: serverTimestamp(),
+  }));
+
+  await assertSucceeds(updateDoc(doc(aliceDb, 'liveStreams/live-alice'), {
+    lastHeartbeat: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(bobDb, 'liveStreams/live-alice'), {
+    lastHeartbeat: serverTimestamp(),
+  }));
+
+  await assertFails(updateDoc(doc(bobDb, 'liveStreams/live-alice'), {
+    status: 'ended',
+    endedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(bobDb, 'liveStreams/live-alice/comments/comment-1'), {
+    text: 'Edited comment',
+  }));
+
+  await assertSucceeds(updateDoc(doc(aliceDb, 'liveStreams/live-alice'), {
+    status: 'ended',
+    endedAt: serverTimestamp(),
+  }));
+  await assertFails(getDoc(doc(bobDb, 'liveStreams/live-alice/comments/comment-1')));
+});

@@ -498,5 +498,53 @@ service cloud.firestore {
           resource.data.toUid == request.auth.uid
         );
     }
+    // LIVE BROADCASTS. Only active members can discover and participate.
+    // The host owns the stream document; comments are append-only.
+    match /liveStreams/{streamId} {
+      allow get, list: if activeMember();
+      allow create: if activeMember()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.status == 'live'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.hostName is string
+        && request.resource.data.hostName.size() <= 120
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.lastHeartbeat == request.time
+        && request.resource.data.keys().hasOnly([
+          'hostUid', 'hostName', 'title', 'status', 'createdAt', 'lastHeartbeat'
+        ]);
+      allow update: if activeMember()
+        && resource.data.hostUid == request.auth.uid
+        && resource.data.status == 'live'
+        && (
+          (request.resource.data.status == 'ended'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
+            && request.resource.data.endedAt == request.time)
+          ||
+          (request.resource.data.status == 'live'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastHeartbeat'])
+            && request.resource.data.lastHeartbeat == request.time)
+        );
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if activeMember()
+          && get(/databases/$(database)/documents/liveStreams/$(streamId)).data.status == 'live';
+        allow create: if activeMember()
+          && get(/databases/$(database)/documents/liveStreams/$(streamId)).data.status == 'live'
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName is string
+          && request.resource.data.senderName.size() <= 120
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'text', 'createdAt']);
+        allow update, delete: if false;
+      }
+    }
+
   }
 }
