@@ -31,6 +31,9 @@ before(async () => {
 
 beforeEach(async () => {
   await testEnv.clearFirestore();
+  for (const uid of ['alice', 'bob', 'mallory', 'mod']) {
+    await seed(`users/${uid}`, { accountStatus: 'active' });
+  }
 });
 
 after(async () => {
@@ -44,6 +47,9 @@ async function seed(path, data) {
 }
 
 test('a member can create only their own profile with their authenticated email', async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await deleteDoc(doc(context.firestore(), 'users/alice'));
+  });
   const aliceDb = testEnv.authenticatedContext('alice', {
     email: 'alice@example.com',
   }).firestore();
@@ -416,4 +422,101 @@ test('a first message and both inbox summaries can be created atomically', async
 
   await assertSucceeds(batch.commit());
   await assertSucceeds(getDocs(collection(aliceDb, 'users', 'alice', 'inbox')));
+});
+
+
+test('suspended members cannot create posts or update their profile, while expired suspensions regain access', async () => {
+  await seed('users/alice', {
+    accountStatus: 'suspended',
+    suspensionUntil: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  await assertSucceeds(getDoc(doc(aliceDb, 'users/alice')));
+  await assertFails(setDoc(doc(aliceDb, 'posts/suspended-post'), {
+    authorId: 'alice',
+    text: 'Should be blocked',
+  }));
+  await assertFails(updateDoc(doc(aliceDb, 'users/alice'), { bio: 'Still blocked' }));
+
+  await seed('users/alice', {
+    accountStatus: 'suspended',
+    suspensionUntil: new Date(Date.now() - 60 * 1000),
+  });
+  await assertSucceeds(setDoc(doc(aliceDb, 'posts/after-expiry'), {
+    authorId: 'alice',
+    text: 'Access restored after expiry',
+  }));
+});
+
+test('only moderators can suspend accounts and create immutable moderation history', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const moderatorDb = testEnv.authenticatedContext('mod', { moderator: true }).firestore();
+  const until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await assertFails(updateDoc(doc(aliceDb, 'users/bob'), {
+    accountStatus: 'banned',
+    suspensionUntil: null,
+    moderationReason: 'Trying to ban another member',
+    moderationUpdatedAt: serverTimestamp(),
+  }));
+
+  const batch = writeBatch(moderatorDb);
+  batch.update(doc(moderatorDb, 'users/bob'), {
+    accountStatus: 'suspended',
+    suspensionUntil: until,
+    moderationReason: 'Repeated spam',
+    moderationUpdatedAt: serverTimestamp(),
+  });
+  batch.set(doc(moderatorDb, 'moderationAccounts/bob'), {
+    uid: 'bob',
+    accountStatus: 'suspended',
+    suspensionUntil: until,
+    reason: 'Repeated spam',
+    warningCount: 0,
+    latestWarning: '',
+    warningAt: null,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(moderatorDb, 'moderationActions/action-1'), {
+    targetUid: 'bob',
+    moderatorUid: 'mod',
+    action: 'suspend',
+    reason: 'Repeated spam',
+    durationHours: 24,
+    createdAt: serverTimestamp(),
+  });
+  await assertSucceeds(batch.commit());
+
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertFails(setDoc(doc(bobDb, 'posts/blocked-post'), {
+    authorId: 'bob',
+    text: 'Suspended member cannot post',
+  }));
+  await assertSucceeds(getDoc(doc(bobDb, 'moderationAccounts/bob')));
+  await assertFails(updateDoc(doc(aliceDb, 'moderationActions/action-1'), {
+    reason: 'Tampered',
+  }));
+});
+
+test('suspended members can submit private appeals but active members cannot', async () => {
+  await seed('users/alice', {
+    accountStatus: 'suspended',
+    suspensionUntil: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+  await assertSucceeds(setDoc(doc(aliceDb, 'moderationAppeals/appeal-1'), {
+    uid: 'alice',
+    reason: 'I believe this suspension was applied in error.',
+    status: 'open',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(bobDb, 'moderationAppeals/appeal-2'), {
+    uid: 'bob',
+    reason: 'I want to appeal even though my account is active.',
+    status: 'open',
+    createdAt: serverTimestamp(),
+  }));
 });

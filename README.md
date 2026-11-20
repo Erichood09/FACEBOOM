@@ -15,7 +15,7 @@ https://faceboom-46273.web.app
 - Friend discovery, requests and friend lists
 - One-to-one private messaging
 - Reporting and blocking controls
-- Moderator report queue protected by the Firebase Auth custom claim `moderator: true`
+- Moderator report queue, reasoned warnings, temporary/permanent account restrictions, reinstatement, member appeals and append-only moderation history protected by the Firebase Auth custom claim `moderator: true`
 - Share links and invitation links
 - Progressive Web App manifest for supported browsers to install the website
 

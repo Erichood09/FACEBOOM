@@ -68,6 +68,12 @@ function App() {
   const [showMessages, setShowMessages] = useState(false);
   const [showModerator, setShowModerator] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
+  const [accountRestriction, setAccountRestriction] = useState(null);
+  const [accountCheckComplete, setAccountCheckComplete] = useState(false);
+  const [warningNotice, setWarningNotice] = useState('');
+  const [appealText, setAppealText] = useState('');
+  const [appealMessage, setAppealMessage] = useState('');
+  const [appealBusy, setAppealBusy] = useState(false);
   const [sharedProfile, setSharedProfile] = useState(null);
   const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
   const [sharedProfileError, setSharedProfileError] = useState('');
@@ -98,6 +104,11 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (!currentUser) {
+        setAccountRestriction(null);
+        setAccountCheckComplete(false);
+        setWarningNotice('');
+      }
       setLoading(false);
     });
 
@@ -127,11 +138,42 @@ function App() {
       if (!user) return;
 
       setProfileLoading(true);
+      setAccountCheckComplete(false);
       setProfileError('');
 
       try {
         const profileRef = doc(db, 'users', user.uid);
         const snapshot = await getDoc(profileRef);
+        const accountData = snapshot.exists() ? snapshot.data() : {};
+        const accountStatus = accountData.accountStatus || 'active';
+        const suspensionUntil = accountData.suspensionUntil?.toDate
+          ? accountData.suspensionUntil.toDate()
+          : null;
+        const isRestricted = accountStatus === 'banned'
+          || (accountStatus === 'suspended'
+            && (!suspensionUntil || suspensionUntil.getTime() > Date.now()));
+
+        if (isRestricted) {
+          setAccountRestriction({
+            status: accountStatus,
+            reason: accountData.moderationReason || '',
+            until: suspensionUntil
+          });
+          setProfileLoading(false);
+          setAccountCheckComplete(true);
+          return;
+        }
+        setAccountRestriction(null);
+
+        try {
+          const moderationSnapshot = await getDoc(doc(db, 'moderationAccounts', user.uid));
+          setWarningNotice(moderationSnapshot.exists()
+            ? moderationSnapshot.data().latestWarning || ''
+            : '');
+        } catch (moderationError) {
+          console.warn('Could not load moderation notice:', moderationError);
+          setWarningNotice('');
+        }
 
         let loadedProfile;
         if (snapshot.exists()) {
@@ -188,10 +230,38 @@ function App() {
         setProfileError('Unable to load your profile.');
       } finally {
         setProfileLoading(false);
+        setAccountCheckComplete(true);
       }
     }
 
     loadProfile();
+  }, [user]);
+
+  // Keep account restrictions synchronized while the member is signed in.
+  // This lets a moderator suspension or reinstatement take effect in the open app.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      const status = data.accountStatus || 'active';
+      const until = data.suspensionUntil?.toDate ? data.suspensionUntil.toDate() : null;
+      const restricted = status === 'banned'
+        || (status === 'suspended' && (!until || until.getTime() > Date.now()));
+      setAccountRestriction(restricted ? {
+        status,
+        reason: data.moderationReason || '',
+        until
+      } : null);
+    }, (err) => console.warn('Live account status listener:', err));
+  }, [user]);
+
+  // Display new warnings as soon as a moderator records them.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, 'moderationAccounts', user.uid), (snapshot) => {
+      setWarningNotice(snapshot.exists() ? snapshot.data().latestWarning || '' : '');
+    }, (err) => console.warn('Moderation notice listener:', err));
   }, [user]);
 
   // LOAD THE CURRENT MEMBER'S BLOCK LIST
@@ -533,6 +603,29 @@ function App() {
       } else {
         setError(err.message);
       }
+    }
+  }
+
+  async function submitAppeal(event) {
+    event.preventDefault();
+    const reason = appealText.trim();
+    if (!user || reason.length < 10 || appealBusy) return;
+    setAppealBusy(true);
+    setAppealMessage('');
+    try {
+      await addDoc(collection(db, 'moderationAppeals'), {
+        uid: user.uid,
+        reason: reason.slice(0, 2000),
+        status: 'open',
+        createdAt: serverTimestamp()
+      });
+      setAppealText('');
+      setAppealMessage('Your appeal has been submitted for moderator review.');
+    } catch (err) {
+      console.error('Appeal submission failed:', err);
+      setAppealMessage('Unable to submit your appeal. Please try again.');
+    } finally {
+      setAppealBusy(false);
     }
   }
 
@@ -963,6 +1056,48 @@ function App() {
     );
   }
 
+  if (!accountCheckComplete) {
+    return (
+      <div style={authPageStyle}>
+        <div style={authCardStyle}>
+          <h1 style={{ color: '#1877f2' }}>FACEBOOM</h1>
+          <p>Checking your account status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (accountRestriction) {
+    return (
+      <div style={authPageStyle}>
+        <div style={authCardStyle}>
+          <h1 style={{ color: '#1877f2' }}>FACEBOOM</h1>
+          <h2>{accountRestriction.status === 'banned' ? 'Account permanently banned' : 'Account temporarily suspended'}</h2>
+          <p>Your account access is restricted following a moderation decision.</p>
+          {accountRestriction.reason && <p><strong>Reason:</strong> {accountRestriction.reason}</p>}
+          {accountRestriction.until && <p><strong>Access expected after:</strong> {accountRestriction.until.toLocaleString()}</p>}
+          <p>You can submit an appeal for review by the moderation team.</p>
+          <form onSubmit={submitAppeal}>
+            <textarea
+              value={appealText}
+              onChange={(event) => setAppealText(event.target.value)}
+              maxLength={2000}
+              minLength={10}
+              required
+              placeholder="Explain why you believe this moderation decision should be reviewed."
+              style={{ ...inputStyle, minHeight: 110, resize: 'vertical' }}
+            />
+            <button type="submit" style={primaryButtonStyle} disabled={appealBusy || appealText.trim().length < 10}>
+              {appealBusy ? 'Submitting...' : 'Submit appeal'}
+            </button>
+          </form>
+          {appealMessage && <p role="status">{appealMessage}</p>}
+          <button type="button" style={cancelButtonStyle} onClick={handleLogout}>Log Out</button>
+        </div>
+      </div>
+    );
+  }
+
   // MAIN HOMEPAGE
   return (
     <div style={homePageStyle}>
@@ -1052,6 +1187,12 @@ function App() {
       </header>
 
       <main style={mainStyle}>
+        {warningNotice && (
+          <div role="status" style={{ ...cardStyle, borderLeft: '4px solid #d97706', marginBottom: 14 }}>
+            <strong>Community guidelines warning</strong>
+            <p style={{ marginBottom: 0 }}>{warningNotice}</p>
+          </div>
+        )}
 
         {sharedProfileLoading ? (
           <div style={cardStyle}><p>Opening shared profile...</p></div>
@@ -1098,7 +1239,7 @@ function App() {
             />
           </div>
         ) : showModerator && isModerator ? (
-          <ModeratorPanel onBack={() => setShowModerator(false)} />
+          <ModeratorPanel user={user} onBack={() => setShowModerator(false)} />
         ) : showMessages ? (
           <MessagesPanel
             user={user}
