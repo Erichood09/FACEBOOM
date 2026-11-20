@@ -63,7 +63,7 @@ export default function LivePanel({ user, profile, onBack }) {
       attached.push(track);
     });
     return () => attached.forEach((track) => track.detach().forEach((element) => element.remove()));
-  }, [mediaTracks]);
+  }, [mediaTracks, activeStream?.id]);
 
   useEffect(() => () => {
     if (room) room.disconnect();
