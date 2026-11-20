@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { collection, addDoc, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { Room, RoomEvent } from 'livekit-client';
 import { db } from './firebase';
 
@@ -110,12 +110,17 @@ export default function LivePanel({ user, profile, onBack }) {
     nextRoom.on(RoomEvent.ParticipantConnected, () => updateParticipants(nextRoom));
     nextRoom.on(RoomEvent.ParticipantDisconnected, () => updateParticipants(nextRoom));
     nextRoom.on(RoomEvent.Disconnected, () => { setMediaTracks([]); setParticipantCount(1); });
-    await nextRoom.connect(livekitUrl, payload.token);
-    if (mode === 'host') {
-      await nextRoom.localParticipant.enableCameraAndMicrophone();
-      nextRoom.localParticipant.videoTrackPublications.forEach((publication) => {
-        if (publication.track) setMediaTracks((all) => [...all, publication.track]);
-      });
+    try {
+      await nextRoom.connect(livekitUrl, payload.token);
+      if (mode === 'host') {
+        await nextRoom.localParticipant.enableCameraAndMicrophone();
+        nextRoom.localParticipant.videoTrackPublications.forEach((publication) => {
+          if (publication.track) setMediaTracks((all) => [...all, publication.track]);
+        });
+      }
+    } catch (connectionError) {
+      nextRoom.disconnect();
+      throw connectionError;
     }
     setRoom(nextRoom);
     updateParticipants(nextRoom);
