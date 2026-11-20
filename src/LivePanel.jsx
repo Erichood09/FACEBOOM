@@ -19,6 +19,7 @@ export default function LivePanel({ user, profile, onBack }) {
   const [room, setRoom] = useState(null);
   const videoHostRef = useRef(null);
   const [mediaTracks, setMediaTracks] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const liveReady = Boolean(tokenEndpoint && livekitUrl);
 
   useEffect(() => {
@@ -30,6 +31,20 @@ export default function LivePanel({ user, profile, onBack }) {
       setError('Unable to load live broadcasts.');
     });
   }, []);
+
+  useEffect(() => {
+    const clock = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(clock);
+  }, []);
+
+  useEffect(() => {
+    if (!activeStream || activeStream.hostUid !== user.uid) return undefined;
+    const heartbeat = () => updateDoc(doc(db, 'liveStreams', activeStream.id), { lastHeartbeat: serverTimestamp() })
+      .catch((err) => console.warn('Live heartbeat:', err));
+    heartbeat();
+    const interval = setInterval(heartbeat, 25000);
+    return () => clearInterval(interval);
+  }, [activeStream?.id, activeStream?.hostUid, user.uid]);
 
   useEffect(() => {
     if (!activeStream) { setComments([]); return undefined; }
@@ -116,7 +131,7 @@ export default function LivePanel({ user, profile, onBack }) {
       const stream = { id: streamRef.id, hostUid: user.uid, hostName: profile.fullName || user.displayName || 'FACEBOOM member', title: title.trim(), status: 'live' };
       await setDoc(streamRef, {
         hostUid: stream.hostUid, hostName: stream.hostName, title: stream.title,
-        status: 'live', createdAt: serverTimestamp()
+        status: 'live', createdAt: serverTimestamp(), lastHeartbeat: serverTimestamp()
       });
       await connectToStream(stream, 'host');
       setActiveStream(stream);
@@ -222,7 +237,7 @@ export default function LivePanel({ user, profile, onBack }) {
           </form>
           <div style={card}>
             <h3>Members Live Now</h3>
-            {streams.length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.filter((stream) => stream.hostUid !== user.uid).map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy || !liveReady} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
+            {streams.filter((stream) => stream.hostUid !== user.uid && stream.lastHeartbeat?.toMillis && now - stream.lastHeartbeat.toMillis() < 90000).length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.filter((stream) => stream.hostUid !== user.uid && stream.lastHeartbeat?.toMillis && now - stream.lastHeartbeat.toMillis() < 90000).map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy || !liveReady} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
           </div>
         </>
       )}
