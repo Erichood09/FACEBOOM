@@ -471,20 +471,20 @@ service cloud.firestore {
 
     // FRIEND REQUESTS
     match /friendRequests/{requestId} {
-      allow read: if signedIn()
+      allow read: if activeMember()
         && (
           resource.data.fromUid == request.auth.uid ||
           resource.data.toUid == request.auth.uid
         );
 
-      allow create: if signedIn()
+      allow create: if activeMember()
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.toUid is string
         && request.resource.data.toUid != request.auth.uid
         && request.resource.data.status == 'pending'
         && !blockedEither(request.auth.uid, request.resource.data.toUid);
 
-      allow update: if signedIn()
+      allow update: if activeMember()
         && resource.data.toUid == request.auth.uid
         && resource.data.status == 'pending'
         && !blockedEither(resource.data.fromUid, resource.data.toUid)
@@ -492,7 +492,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'respondedAt']);
 
-      allow delete: if signedIn()
+      allow delete: if activeMember()
         && (
           resource.data.fromUid == request.auth.uid ||
           resource.data.toUid == request.auth.uid
