@@ -532,6 +532,7 @@ test('active members can join live streams, comment while live, and only the hos
     title: 'Community update',
     status: 'live',
     createdAt: serverTimestamp(),
+    lastHeartbeat: serverTimestamp(),
   }));
 
   await assertSucceeds(getDoc(doc(bobDb, 'liveStreams/live-alice')));
