@@ -34,6 +34,12 @@ jobs:
       - name: Test Firestore security rules
         run: npm run test:rules
 
+      - name: Validate secure LiveKit token worker
+        working-directory: workers/livekit-token
+        run: |
+          npm install
+          npm run check
+
       - name: Build application
         env:
           VITE_LIVEKIT_TOKEN_URL: ${{ vars.VITE_LIVEKIT_TOKEN_URL }}
