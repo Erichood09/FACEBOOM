@@ -73,13 +73,8 @@ service cloud.firestore {
         && activeMember()
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly([
-            'fullName',
-            'username',
-            'country',
-            'photoURL',
-            'coverPhotoURL',
-            'bio',
-            'updatedAt'
+            'fullName', 'username', 'country', 'photoURL',
+            'coverPhotoURL', 'bio', 'updatedAt'
           ])
       ) || (
         isModerator()
@@ -97,99 +92,6 @@ service cloud.firestore {
       );
 
       allow delete: if false;
-
-      // FRIENDS SUBCOLLECTION
-      match /friends/{friendUid} {
-        allow read: if ownsUser(userId);
-
-        allow create, update: if signedIn()
-          && (request.auth.uid == userId || request.auth.uid == friendUid)
-          && request.resource.data.uid == friendUid
-          && acceptedFriendPair(userId, friendUid)
-          && !blockedEither(userId, friendUid);
-
-        allow delete: if signedIn()
-          && (request.auth.uid == userId || request.auth.uid == friendUid);
-      }
-
-      // Inbox summaries are stored under each participant's own user document.
-      // The owner can query their inbox; either participant may refresh a summary
-      // only while the conversation exists and neither side has blocked the other.
-      match /inbox/{conversationId} {
-        function conversationPath() {
-          return /databases/$(database)/documents/conversations/$(conversationId);
-        }
-
-        allow get, list: if ownsUser(userId);
-
-        allow create, update: if signedIn()
-          && request.auth.uid in request.resource.data.participants
-          && userId in request.resource.data.participants
-          && request.resource.data.participants is list
-          && request.resource.data.participants.size() == 2
-          && request.resource.data.otherUid
-            == (request.resource.data.participants[0] == userId
-              ? request.resource.data.participants[1]
-              : request.resource.data.participants[0])
-          && existsAfter(conversationPath())
-          && getAfter(conversationPath()).data.participants == request.resource.data.participants
-          && !blockedEither(
-            request.resource.data.participants[0],
-            request.resource.data.participants[1]
-          )
-          && request.resource.data.conversationId == conversationId
-          && request.resource.data.lastMessage is string
-          && request.resource.data.lastMessage.size() <= 4000
-          && request.resource.data.lastSenderId is string
-          && request.resource.data.updatedAt == request.time
-          && request.resource.data.keys().hasOnly([
-            'conversationId', 'participants', 'otherUid',
-            'lastMessage', 'lastSenderId', 'updatedAt'
-          ]);
-
-        // A blocker may atomically remove the other member's inbox summary
-        // in the same batch that creates the block record.
-        allow delete: if ownsUser(userId)
-          || (
-            signedIn()
-            && resource.data.otherUid == request.auth.uid
-            && existsAfter(
-              /databases/$(database)/documents/users/$(request.auth.uid)/blocked/$(userId)
-            )
-          );
-      }
-
-      // The blocked member can read who blocked them so the client can hide
-      // that relationship from discovery, feed and messaging views.
-      // Only the original blocker may create or remove this mirror.
-      match /blockedBy/{blockerUid} {
-        allow read: if ownsUser(userId);
-        allow create: if signedIn()
-          && request.auth.uid == blockerUid
-          && userId != blockerUid
-          && request.resource.data.uid == blockerUid
-          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
-          && existsAfter(
-            /databases/$(database)/documents/users/$(blockerUid)/blocked/$(userId)
-          );
-        allow delete: if signedIn() && request.auth.uid == blockerUid;
-        allow update: if false;
-      }
-
-      // A member can manage only their own block list.
-      match /blocked/{blockedUid} {
-        allow read: if ownsUser(userId);
-        allow create: if ownsUser(userId)
-          && blockedUid != userId
-          && request.resource.data.uid == blockedUid
-          && request.resource.data.keys().hasOnly(['uid', 'fullName', 'createdAt'])
-          && (!('fullName' in request.resource.data)
-            || (request.resource.data.fullName is string
-              && request.resource.data.fullName.size() <= 120));
-        allow update: if false;
-        allow delete: if ownsUser(userId);
-      }
-    }
 
       // FRIENDS SUBCOLLECTION
       match /friends/{friendUid} {
@@ -288,29 +190,6 @@ service cloud.firestore {
     match /publicProfiles/{userId} {
       // Keep directory queries available for discovery. A direct profile lookup
       // is denied when either member has blocked the other.
-      allow get: if signedIn() && !blockedEither(request.auth.uid, userId);
-      allow list: if signedIn();
-
-      allow create, update: if ownsUser(userId)
-        && request.resource.data.uid == userId
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'fullName',
-          'username',
-          'country',
-          'bio',
-          'photoURL',
-          'coverPhotoURL',
-          'updatedAt'
-        ]);
-
-      allow delete: if false;
-    }
-
-    // PUBLIC PROFILE DIRECTORY
-    match /publicProfiles/{userId} {
-      // Keep directory queries available for discovery. A direct profile lookup
-      // is denied when either member has blocked the other.
       allow get: if activeMember() && !blockedEither(request.auth.uid, userId);
       allow list: if activeMember();
 
@@ -329,64 +208,6 @@ service cloud.firestore {
 
       allow delete: if false;
     }
-
-    // POSTS
-    match /posts/{postId} {
-      // Feed queries are filtered client-side; direct post links respect blocks.
-      allow get: if signedIn()
-        && !blockedEither(request.auth.uid, resource.data.authorId);
-      allow list: if signedIn();
-
-      allow create: if signedIn()
-        && request.resource.data.authorId == request.auth.uid;
-
-      allow update: if false;
-
-      allow delete: if signedIn()
-        && resource.data.authorId == request.auth.uid;
-
-      // LIKES
-      match /likes/{likeId} {
-        allow read: if signedIn();
-
-        allow create: if signedIn()
-          && likeId == request.auth.uid
-          && request.resource.data.userId == request.auth.uid
-          && !blockedEither(
-            request.auth.uid,
-            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
-          );
-
-        allow update: if false;
-
-        allow delete: if signedIn()
-          && (
-            likeId == request.auth.uid ||
-            resource.data.userId == request.auth.uid
-          );
-      }
-
-      // COMMENTS
-      match /comments/{commentId} {
-        allow read: if signedIn();
-
-        allow create: if signedIn()
-          && request.resource.data.authorId == request.auth.uid
-          && !blockedEither(
-            request.auth.uid,
-            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
-          )
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
-
-        allow update: if false;
-
-        allow delete: if signedIn()
-          && resource.data.authorId == request.auth.uid;
-      }
-    }
-
 
     // POSTS
     match /posts/{postId} {
@@ -445,97 +266,6 @@ service cloud.firestore {
       }
     }
 
-
-    // PRIVATE CONVERSATIONS
-    match /conversations/{conversationId} {
-      function isParticipant() {
-        return signedIn()
-          && request.auth.uid in resource.data.participants;
-      }
-
-      // A signed-in sender may check whether a deterministic conversation
-      // document exists before creating it. Existing conversations remain
-      // readable only by their two participants.
-      allow get: if signedIn()
-        && (
-          resource == null ||
-          (
-            isParticipant() &&
-            !blockedEither(resource.data.participants[0], resource.data.participants[1])
-          )
-        );
-      allow list: if isParticipant()
-        && !blockedEither(resource.data.participants[0], resource.data.participants[1]);
-
-      allow create: if signedIn()
-        && request.resource.data.keys().hasAll([
-          'participants', 'createdBy', 'lastMessage',
-          'lastSenderId', 'createdAt', 'updatedAt'
-        ])
-        && request.resource.data.keys().hasOnly([
-          'participants', 'createdBy', 'lastMessage',
-          'lastSenderId', 'createdAt', 'updatedAt'
-        ])
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() == 2
-        && request.resource.data.participants[0] != request.resource.data.participants[1]
-        && request.resource.data.participants.hasAny([request.auth.uid])
-        && !blockedEither(request.resource.data.participants[0], request.resource.data.participants[1])
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.lastSenderId == request.auth.uid
-        && request.resource.data.lastMessage is string
-        && request.resource.data.lastMessage.size() > 0
-        && request.resource.data.lastMessage.size() <= 4000
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
-
-      allow update: if isParticipant()
-        && !blockedEither(resource.data.participants[0], resource.data.participants[1])
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastMessage', 'lastSenderId', 'updatedAt'])
-        && request.resource.data.lastSenderId == request.auth.uid
-        && request.resource.data.lastMessage is string
-        && request.resource.data.lastMessage.size() > 0
-        && request.resource.data.lastMessage.size() <= 4000
-        && request.resource.data.updatedAt == request.time;
-
-      allow delete: if false;
-
-      match /messages/{messageId} {
-        function parentConversation() {
-          return get(/databases/$(database)/documents/conversations/$(conversationId));
-        }
-
-        allow read: if signedIn()
-          && parentConversation().data.participants.hasAny([request.auth.uid])
-          && !blockedEither(
-            parentConversation().data.participants[0],
-            parentConversation().data.participants[1]
-          );
-
-        allow create: if signedIn()
-          && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid])
-          && !blockedEither(
-            getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants[0],
-            getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants[1]
-          )
-          && request.resource.data.keys().hasAll([
-            'text', 'senderId', 'senderName', 'createdAt'
-          ])
-          && request.resource.data.keys().hasOnly([
-            'text', 'senderId', 'senderName', 'createdAt'
-          ])
-          && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 4000
-          && request.resource.data.senderName is string
-          && request.resource.data.senderName.size() <= 120
-          && request.resource.data.createdAt == request.time;
-
-        allow update, delete: if false;
-      }
-    }
 
     // PRIVATE CONVERSATIONS
     match /conversations/{conversationId} {
@@ -631,37 +361,6 @@ service cloud.firestore {
     // USER REPORTS: reporters can create/read their own reports.
     // Trusted moderators need a Firebase Auth custom claim: moderator=true.
     match /reports/{reportId} {
-      allow create: if signedIn()
-        && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.targetUid is string
-        && request.resource.data.contentId is string
-        && request.resource.data.contentType in ['post', 'account', 'comment', 'message']
-        && request.resource.data.reason in [
-          'harassment', 'hate', 'violence', 'sexual', 'spam', 'privacy', 'other'
-        ]
-        && request.resource.data.details is string
-        && request.resource.data.details.size() <= 1000
-        && request.resource.data.status == 'open'
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.keys().hasOnly([
-          'reporterId', 'targetUid', 'contentType', 'contentId',
-          'reason', 'details', 'status', 'createdAt'
-        ]);
-      allow read: if signedIn()
-        && (resource.data.reporterId == request.auth.uid || isModerator());
-      allow update: if isModerator()
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'moderatorNote', 'resolvedAt'])
-        && request.resource.data.status in ['open', 'reviewing', 'resolved', 'dismissed']
-        && (!('moderatorNote' in request.resource.data)
-          || (request.resource.data.moderatorNote is string
-            && request.resource.data.moderatorNote.size() <= 1000));
-      allow delete: if false;
-    }
-
-    // USER REPORTS: reporters can create/read their own reports.
-    // Trusted moderators need a Firebase Auth custom claim: moderator=true.
-    match /reports/{reportId} {
       allow create: if activeMember()
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.targetUid is string
@@ -694,7 +393,6 @@ service cloud.firestore {
     match /moderationAccounts/{targetUid} {
       allow get: if isModerator() || ownsUser(targetUid);
       allow list: if isModerator();
-
       allow create, update: if isModerator()
         && request.resource.data.uid == targetUid
         && request.resource.data.keys().hasOnly([
@@ -718,11 +416,10 @@ service cloud.firestore {
           == request.resource.data.accountStatus
         && getAfter(/databases/$(database)/documents/users/$(targetUid)).data.suspensionUntil
           == request.resource.data.suspensionUntil;
-
       allow delete: if false;
     }
 
-    // Append-only moderation audit trail. A member can see only actions
+    // Append-only moderation audit trail. Members can see only actions
     // concerning their own account; moderators can review the full history.
     match /moderationActions/{actionId} {
       allow create: if isModerator()
