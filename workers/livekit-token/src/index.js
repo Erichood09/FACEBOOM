@@ -44,7 +44,13 @@ export default {
       if (!profileResponse.ok) return json({ error: 'Could not verify your FACEBOOM account.' }, 403, origin);
       const profileDocument = await profileResponse.json();
       const accountStatus = profileDocument.fields?.accountStatus?.stringValue || 'active';
-      if (accountStatus !== 'active') return json({ error: 'Your account cannot join a live broadcast.' }, 403, origin);
+      const suspensionUntil = profileDocument.fields?.suspensionUntil?.timestampValue || '';
+      const suspensionExpired = accountStatus === 'suspended'
+        && suspensionUntil
+        && Date.parse(suspensionUntil) <= Date.now();
+      if (accountStatus !== 'active' && !suspensionExpired) {
+        return json({ error: 'Your account cannot join a live broadcast.' }, 403, origin);
+      }
 
       const streamResponse = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/liveStreams/${streamId}`, {
         headers: { Authorization: `Bearer ${idToken}` }
