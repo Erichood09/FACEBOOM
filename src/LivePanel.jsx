@@ -110,8 +110,9 @@ export default function LivePanel({ user, profile, onBack }) {
     if (!title.trim() || busy) return;
     setBusy(true); setError(''); setStatus('');
     try {
-      const stream = { id: user.uid, hostUid: user.uid, hostName: profile.fullName || user.displayName || 'FACEBOOM member', title: title.trim(), status: 'live' };
-      await setDoc(doc(db, 'liveStreams', user.uid), {
+      const streamRef = doc(collection(db, 'liveStreams'));
+      const stream = { id: streamRef.id, hostUid: user.uid, hostName: profile.fullName || user.displayName || 'FACEBOOM member', title: title.trim(), status: 'live' };
+      await setDoc(streamRef, {
         hostUid: stream.hostUid, hostName: stream.hostName, title: stream.title,
         status: 'live', createdAt: serverTimestamp()
       });
@@ -120,7 +121,7 @@ export default function LivePanel({ user, profile, onBack }) {
       setStatus('You are live. Keep this page open while broadcasting.');
     } catch (err) {
       console.error('Start broadcast:', err);
-      await updateDoc(doc(db, 'liveStreams', user.uid), { status: 'ended', endedAt: serverTimestamp() }).catch(() => {});
+      if (typeof streamRef !== 'undefined') await updateDoc(streamRef, { status: 'ended', endedAt: serverTimestamp() }).catch(() => {});
       setError(err.message || 'Could not start your broadcast.');
     } finally { setBusy(false); }
   }
@@ -151,7 +152,7 @@ export default function LivePanel({ user, profile, onBack }) {
     try {
       if (room) room.disconnect();
       setRoom(null); setMediaTracks([]); setActiveStream(null);
-      await updateDoc(doc(db, 'liveStreams', user.uid), { status: 'ended', endedAt: serverTimestamp() });
+      await updateDoc(doc(db, 'liveStreams', activeStream.id), { status: 'ended', endedAt: serverTimestamp() });
       setStatus('Your broadcast has ended.');
     } catch (err) {
       setError('Could not end the broadcast cleanly. Please try again.');
@@ -218,7 +219,7 @@ export default function LivePanel({ user, profile, onBack }) {
           </form>
           <div style={card}>
             <h3>Members Live Now</h3>
-            {streams.length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
+            {streams.length === 0 ? <p style={{ color: '#687684', marginTop: 10 }}>No members are live right now.</p> : streams.filter((stream) => stream.hostUid !== user.uid).map((stream) => <div key={stream.id} style={{ borderTop: '1px solid #edf0f2', padding: '13px 0', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><strong style={{ color: '#d93025' }}>● LIVE</strong><h4>{stream.title}</h4><p style={{ color: '#687684', fontSize: 13 }}> {stream.hostName}</p></div><button type="button" style={button} disabled={busy} onClick={() => joinBroadcast(stream)}>Watch Live</button></div>)}
           </div>
         </>
       )}
