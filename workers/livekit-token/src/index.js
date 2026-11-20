@@ -1,5 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose';
 
 const FIREBASE_PROJECT_ID = 'faceboom-46273';
 const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
@@ -65,19 +64,22 @@ export default {
         return json({ error: 'You are not authorized for this live session.' }, 403, origin);
       }
 
-      const accessToken = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
-        identity: uid,
+      const token = await new SignJWT({
         name: profileDocument.fields?.fullName?.stringValue || 'FACEBOOM member',
-        ttl: '1h'
-      });
-      accessToken.addGrant({
-        roomJoin: true,
-        room: `faceboom-${streamId}`,
-        canPublish: mode === 'host',
-        canSubscribe: true,
-        canPublishData: mode === 'host'
-      });
-      const token = await accessToken.toJwt();
+        video: {
+          roomJoin: true,
+          room: `faceboom-${streamId}`,
+          canPublish: mode === 'host',
+          canSubscribe: true,
+          canPublishData: mode === 'host'
+        }
+      })
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setIssuer(env.LIVEKIT_API_KEY)
+        .setSubject(uid)
+        .setIssuedAt()
+        .setExpirationTime('1h')
+        .sign(new TextEncoder().encode(env.LIVEKIT_API_SECRET));
       return json({ token }, 200, origin);
     } catch (error) {
       console.error('Live token error:', error);
