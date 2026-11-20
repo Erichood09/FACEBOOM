@@ -503,7 +503,6 @@ service cloud.firestore {
     match /liveStreams/{streamId} {
       allow get, list: if activeMember();
       allow create: if activeMember()
-        && streamId == request.auth.uid
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.status == 'live'
         && request.resource.data.title is string
