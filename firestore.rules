@@ -365,7 +365,7 @@ service cloud.firestore {
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.targetUid is string
         && request.resource.data.contentId is string
-        && request.resource.data.contentType in ['post', 'account', 'comment', 'message']
+        && request.resource.data.contentType in ['post', 'account', 'comment', 'message', 'live_stream']
         && request.resource.data.reason in [
           'harassment', 'hate', 'violence', 'sexual', 'spam', 'privacy', 'other'
         ]
