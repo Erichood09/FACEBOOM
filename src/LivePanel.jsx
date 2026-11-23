@@ -250,6 +250,26 @@ export default function LivePanel({ user, profile, onBack }) {
     } finally { setBusy(false); }
   }
 
+  async function togglePinnedComment(comment) {
+    if (!activeStream || activeStream.hostUid !== user.uid) return;
+    const isSamePinned = activeStream.pinnedCommentText === comment?.text
+      && activeStream.pinnedCommentSenderName === comment?.senderName;
+    const update = {
+      pinnedCommentText: isSamePinned ? null : comment.text,
+      pinnedCommentSenderName: isSamePinned ? null : comment.senderName,
+      pinnedBy: user.uid,
+      pinnedAt: serverTimestamp()
+    };
+    try {
+      await updateDoc(doc(db, 'liveStreams', activeStream.id), update);
+      setActiveStream((current) => ({ ...current, ...update, pinnedAt: null }));
+      setStatus(isSamePinned ? 'Pinned comment removed.' : 'Comment pinned for everyone watching.');
+    } catch (err) {
+      console.error('Pin live comment:', err);
+      setError('Could not update the pinned comment.');
+    }
+  }
+
   async function sendComment(event) {
     event.preventDefault();
     const text = draft.trim();
@@ -382,9 +402,26 @@ export default function LivePanel({ user, profile, onBack }) {
               {giftEvents.length === 0 && <span style={{ color: '#8a755d', fontSize: 13 }}>No gifts yet. Be the first to send one!</span>}
             </div>
           </div>
+          {activeStream.pinnedCommentText && (
+            <div style={{ marginTop: 16, padding: 12, borderRadius: 9, background: '#eef5ff', border: '1px solid #c9dcfa' }}>
+              <strong>📌 Pinned comment</strong>
+              <p style={{ margin: '5px 0 0', overflowWrap: 'anywhere' }}>{activeStream.pinnedCommentText}</p>
+              <small style={{ color: '#536579' }}>— {activeStream.pinnedCommentSenderName || 'FACEBOOM member'}</small>
+              {activeStream.hostUid === user.uid && <button type="button" style={{ ...muted, display: 'block', marginTop: 8 }} onClick={() => togglePinnedComment({ text: activeStream.pinnedCommentText, senderName: activeStream.pinnedCommentSenderName })}>Unpin comment</button>}
+            </div>
+          )}
           <h3 style={{ marginTop: 18 }}>Live comments</h3>
           <div style={{ maxHeight: 240, overflowY: 'auto', padding: 10, background: '#f7f8fa', borderRadius: 8 }}>
-            {comments.map((comment) => <p key={comment.id} style={{ margin: '7px 0', overflowWrap: 'anywhere' }}><strong>{comment.senderName}: </strong>{comment.text}</p>)}
+            {comments.map((comment) => (
+              <div key={comment.id} style={{ margin: '7px 0', padding: '7px 8px', borderRadius: 7, background: activeStream.pinnedCommentText === comment.text && activeStream.pinnedCommentSenderName === comment.senderName ? '#eaf2ff' : 'transparent' }}>
+                <strong>{comment.senderName}: </strong>{comment.text}
+                {activeStream.hostUid === user.uid && (
+                  <button type="button" style={{ ...muted, padding: '4px 8px', marginLeft: 8, fontSize: 11 }} onClick={() => togglePinnedComment(comment)}>
+                    {activeStream.pinnedCommentText === comment.text && activeStream.pinnedCommentSenderName === comment.senderName ? 'Unpin' : 'Pin'}
+                  </button>
+                )}
+              </div>
+            ))}
             {comments.length === 0 && <p style={{ color: '#687684' }}>No comments yet. Say hello!</p>}
           </div>
           <form onSubmit={sendComment} style={{ display: 'flex', gap: 8, marginTop: 10 }}>
