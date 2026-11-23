@@ -183,7 +183,7 @@ export default function LivePanel({ user, profile, onBack }) {
     });
     try {
       await nextRoom.connect(livekitUrl, payload.token);
-      if (mode === 'host') {
+      if (mode === 'host' || mode === 'guest') {
         await nextRoom.localParticipant.enableCameraAndMicrophone();
         setCameraEnabled(true);
         setMicrophoneEnabled(true);
@@ -463,7 +463,9 @@ export default function LivePanel({ user, profile, onBack }) {
             </div>
           ) : (
             <div style={{ marginTop: 12 }}>
-              {!room && myGuestRequest?.status !== 'approved' && <button type="button" style={muted} onClick={requestToJoinAsGuest} disabled={myGuestRequest?.status === 'pending'}>{myGuestRequest?.status === 'pending' ? 'Guest request sent — waiting for host' : myGuestRequest?.status === 'rejected' ? 'Request was declined' : '🙋 Request to join on screen'}</button>}
+              {!room && !myGuestRequest && <button type="button" style={muted} onClick={requestToJoinAsGuest}>🙋 Request to join on screen</button>}
+              {!room && myGuestRequest?.status === 'pending' && <span style={{ color: '#8a5a20', fontSize: 13 }}>Your guest request is waiting for the host.</span>}
+              {!room && myGuestRequest?.status === 'rejected' && <span style={{ color: '#a52a2a', fontSize: 13 }}>The host declined your request.</span>}
               {room && <span style={{ color: '#187a3d', fontSize: 13 }}>You are connected as a guest.</span>}
             </div>
           )}
