@@ -545,6 +545,22 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Append-only live reactions. Client pacing is only a UI safeguard;
+      // production anti-spam enforcement should be moved to a trusted endpoint.
+      match /heartEvents/{heartId} {
+        allow read: if activeMember()
+          && get(/databases/$(database)/documents/liveStreams/$(streamId)).data.status == 'live';
+        allow create: if activeMember()
+          && get(/databases/$(database)/documents/liveStreams/$(streamId)).data.status == 'live'
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName is string
+          && request.resource.data.senderName.size() > 0
+          && request.resource.data.senderName.size() <= 120
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'createdAt']);
+        allow update, delete: if false;
+      }
+
       // FREE LIVE GIFTS ONLY. Paid gifts and money balances must be handled
       // by a trusted payment backend, never by client-side Firestore writes.
       match /giftEvents/{giftId} {
