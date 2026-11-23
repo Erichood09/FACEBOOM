@@ -59,15 +59,23 @@ export default function LivePanel({ user, profile, onBack }) {
   }, [activeStream?.id, activeStream?.hostUid, user.uid]);
 
   useEffect(() => {
-  useEffect(() => {
-    if (!activeStream || activeStream.hostUid !== user.uid) { setGuestRequests([]); return undefined; }
+    if (!activeStream || activeStream.hostUid !== user.uid) {
+      setGuestRequests([]);
+      return undefined;
+    }
     return onSnapshot(collection(db, 'liveStreams', activeStream.id, 'guestRequests'), (snapshot) => {
       setGuestRequests(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-    }, (err) => { console.error('Live guest requests:', err); setError('Unable to load guest requests.'); });
+    }, (err) => {
+      console.error('Live guest requests:', err);
+      setError('Unable to load guest requests.');
+    });
   }, [activeStream?.id, activeStream?.hostUid, user.uid]);
 
   useEffect(() => {
-    if (!activeStream || activeStream.hostUid === user.uid) { setMyGuestRequest(null); return undefined; }
+    if (!activeStream || activeStream.hostUid === user.uid) {
+      setMyGuestRequest(null);
+      return undefined;
+    }
     guestConnectStarted.current = false;
     const requestRef = doc(db, 'liveStreams', activeStream.id, 'guestRequests', user.uid);
     return onSnapshot(requestRef, async (snapshot) => {
@@ -75,14 +83,26 @@ export default function LivePanel({ user, profile, onBack }) {
       setMyGuestRequest(request);
       if (request?.status === 'approved' && !guestConnectStarted.current && !room) {
         guestConnectStarted.current = true;
-        try { await connectToStream(activeStream, 'guest'); setStatus('The host approved your request. You have joined the live session as a guest.'); }
-        catch (err) { guestConnectStarted.current = false; setError(err.message || 'Could not join as a guest.'); }
+        try {
+          await connectToStream(activeStream, 'guest');
+          setStatus('The host approved your request. You have joined the live session as a guest.');
+        } catch (err) {
+          guestConnectStarted.current = false;
+          setError(err.message || 'Could not join as a guest.');
+        }
       }
     }, (err) => console.error('Your live guest request:', err));
-  }, [activeStream?.id, activeStream?.hostUid, user.uid]);
+  }, [activeStream?.id, activeStream?.hostUid, user.uid, room]);
 
-    if (!activeStream) { setComments([]); return undefined; }
-    const commentsQuery = query(collection(db, 'liveStreams', activeStream.id, 'comments'), orderBy('createdAt', 'asc'));
+  useEffect(() => {
+    if (!activeStream) {
+      setComments([]);
+      return undefined;
+    }
+    const commentsQuery = query(
+      collection(db, 'liveStreams', activeStream.id, 'comments'),
+      orderBy('createdAt', 'asc')
+    );
     return onSnapshot(commentsQuery, (snapshot) => {
       setComments(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
     }, (err) => {
