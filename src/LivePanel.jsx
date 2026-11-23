@@ -13,6 +13,8 @@ export default function LivePanel({ user, profile, onBack }) {
   const [comments, setComments] = useState([]);
   const [giftEvents, setGiftEvents] = useState([]);
   const [giftBusy, setGiftBusy] = useState(false);
+  const [heartEvents, setHeartEvents] = useState([]);
+  const lastHeartAt = useRef(0);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -71,6 +73,21 @@ export default function LivePanel({ user, profile, onBack }) {
     }, (err) => {
       console.error('Live gifts:', err);
       setError('Unable to load live gifts.');
+    });
+  }, [activeStream?.id]);
+
+  useEffect(() => {
+    if (!activeStream) { setHeartEvents([]); return undefined; }
+    const heartsQuery = query(
+      collection(db, 'liveStreams', activeStream.id, 'heartEvents'),
+      orderBy('createdAt', 'desc'),
+      limit(12)
+    );
+    return onSnapshot(heartsQuery, (snapshot) => {
+      setHeartEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    }, (err) => {
+      console.error('Live hearts:', err);
+      setError('Unable to load live reactions.');
     });
   }, [activeStream?.id]);
 
@@ -250,6 +267,25 @@ export default function LivePanel({ user, profile, onBack }) {
     }
   }
 
+  async function sendHeart() {
+    if (!activeStream) return;
+    const currentTime = Date.now();
+    // Client-side pacing keeps the UI responsive; server-side rate limiting
+    // is still required before this can be treated as abuse-resistant.
+    if (currentTime - lastHeartAt.current < 700) return;
+    lastHeartAt.current = currentTime;
+    try {
+      await addDoc(collection(db, 'liveStreams', activeStream.id, 'heartEvents'), {
+        senderId: user.uid,
+        senderName: profile.fullName || user.displayName || 'FACEBOOM member',
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error('Send live reaction:', err);
+      setError('Your reaction could not be sent.');
+    }
+  }
+
   const button = { border: 0, borderRadius: 8, padding: '10px 14px', background: '#1877f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
   const muted = { ...button, background: '#eef2f7', color: '#263445' };
   const card = { background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, boxShadow: '0 1px 5px rgba(0,0,0,.07)' };
@@ -257,6 +293,11 @@ export default function LivePanel({ user, profile, onBack }) {
   return (
     <section>
       <style>{`
+        @keyframes faceboomHeartFloat {
+          0% { opacity: 0; transform: translateY(18px) scale(.6); }
+          20% { opacity: 1; }
+          100% { opacity: 0; transform: translateY(-72px) scale(1.25); }
+        }
         @keyframes faceboomGiftPop {
           0% { opacity: 0; transform: translateY(10px) scale(.72); }
           65% { opacity: 1; transform: translateY(-2px) scale(1.08); }
@@ -276,7 +317,15 @@ export default function LivePanel({ user, profile, onBack }) {
             <div><strong style={{ color: '#d93025' }}>● LIVE</strong><h3>{activeStream.title}</h3><p>Hosted by {activeStream.hostName}</p></div>
             <strong>👥 {participantCount} connected</strong>
           </div>
-          <div ref={videoHostRef} style={{ minHeight: 220, background: '#111', borderRadius: 10, overflow: 'hidden', display: 'grid', gap: 4, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', alignItems: 'center' }} />
+          <div style={{ position: 'relative' }}>
+            <div ref={videoHostRef} style={{ minHeight: 220, background: '#111', borderRadius: 10, overflow: 'hidden', display: 'grid', gap: 4, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', alignItems: 'center' }} />
+            <div aria-live="polite" style={{ position: 'absolute', right: 18, bottom: 14, display: 'flex', flexDirection: 'column-reverse', gap: 4, pointerEvents: 'none' }}>
+              {heartEvents.slice(0, 5).map((heart) => (
+                <span key={heart.id} style={{ fontSize: 27, animation: 'faceboomHeartFloat 1800ms ease-out both' }} title={heart.senderName || 'Live reaction'}>❤️</span>
+              ))}
+            </div>
+          </div>
+          <button type="button" style={{ ...button, borderRadius: 24, marginTop: 10, background: '#e83e68' }} onClick={sendHeart}>❤️ Send heart</button>
           {activeStream.hostUid === user.uid
             ? <button type="button" style={{ ...button, background: '#c62828', marginTop: 12 }} disabled={busy} onClick={endBroadcast}>End Live</button>
             : <button type="button" style={{ ...muted, marginTop: 12 }} onClick={leaveBroadcast}>Leave Live</button>}
