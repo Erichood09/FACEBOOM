@@ -49,6 +49,12 @@ jobs:
         env:
           VITE_LIVEKIT_TOKEN_URL: ${{ vars.VITE_LIVEKIT_TOKEN_URL }}
           VITE_LIVEKIT_WS_URL: ${{ vars.VITE_LIVEKIT_WS_URL }}
+          VITE_FIREBASE_API_KEY: ${{ github.event_name == 'pull_request' && 'AIzaSyCSvsWGBj2wjF3SOfv9_bxpE1JnOfeO1_Y' || '' }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ github.event_name == 'pull_request' && 'faceboom-live-test.firebaseapp.com' || '' }}
+          VITE_FIREBASE_PROJECT_ID: ${{ github.event_name == 'pull_request' && 'faceboom-live-test' || '' }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ github.event_name == 'pull_request' && 'faceboom-live-test.firebasestorage.app' || '' }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ github.event_name == 'pull_request' && '136081680775' || '' }}
+          VITE_FIREBASE_APP_ID: ${{ github.event_name == 'pull_request' && '1:136081680775:web:476178ab8d6daec8734b22' || '' }}
         run: npm run build
 
       - name: Deploy Firestore rules through the Firebase Rules API
