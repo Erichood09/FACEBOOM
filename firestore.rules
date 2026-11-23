@@ -526,6 +526,20 @@ service cloud.firestore {
           (request.resource.data.status == 'live'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastHeartbeat'])
             && request.resource.data.lastHeartbeat == request.time)
+          ||
+          (request.resource.data.status == 'live'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'pinnedCommentText', 'pinnedCommentSenderName', 'pinnedBy', 'pinnedAt'
+            ])
+            && request.resource.data.pinnedBy == request.auth.uid
+            && request.resource.data.pinnedAt == request.time
+            && (request.resource.data.pinnedCommentText == null
+              || (request.resource.data.pinnedCommentText is string
+                && request.resource.data.pinnedCommentText.size() > 0
+                && request.resource.data.pinnedCommentText.size() <= 500))
+            && (request.resource.data.pinnedCommentSenderName == null
+              || (request.resource.data.pinnedCommentSenderName is string
+                && request.resource.data.pinnedCommentSenderName.size() <= 120)))
         );
       allow delete: if false;
 
