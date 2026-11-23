@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit } from 'firebase/firestore';
 import { Room, RoomEvent } from 'livekit-client';
 import { db } from './firebase';
 
@@ -11,6 +11,8 @@ export default function LivePanel({ user, profile, onBack }) {
   const [activeStream, setActiveStream] = useState(null);
   const [title, setTitle] = useState('');
   const [comments, setComments] = useState([]);
+  const [giftEvents, setGiftEvents] = useState([]);
+  const [giftBusy, setGiftBusy] = useState(false);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -54,6 +56,21 @@ export default function LivePanel({ user, profile, onBack }) {
     }, (err) => {
       console.error('Live comments:', err);
       setError('Unable to load live comments.');
+    });
+  }, [activeStream?.id]);
+
+  useEffect(() => {
+    if (!activeStream) { setGiftEvents([]); return undefined; }
+    const giftsQuery = query(
+      collection(db, 'liveStreams', activeStream.id, 'giftEvents'),
+      orderBy('createdAt', 'desc'),
+      limit(15)
+    );
+    return onSnapshot(giftsQuery, (snapshot) => {
+      setGiftEvents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    }, (err) => {
+      console.error('Live gifts:', err);
+      setError('Unable to load live gifts.');
     });
   }, [activeStream?.id]);
 
@@ -204,6 +221,35 @@ export default function LivePanel({ user, profile, onBack }) {
     }
   }
 
+  const freeGifts = [
+    { id: 'heart', name: 'Heart', emoji: '❤️' },
+    { id: 'rose', name: 'Rose', emoji: '🌹' },
+    { id: 'clap', name: 'Clap', emoji: '👏' },
+    { id: 'star', name: 'Star', emoji: '⭐' }
+  ];
+
+  async function sendFreeGift(gift) {
+    if (!activeStream || giftBusy) return;
+    setGiftBusy(true);
+    setError('');
+    try {
+      await addDoc(collection(db, 'liveStreams', activeStream.id, 'giftEvents'), {
+        senderId: user.uid,
+        senderName: profile.fullName || user.displayName || 'FACEBOOM member',
+        giftId: gift.id,
+        giftName: gift.name,
+        emoji: gift.emoji,
+        kind: 'free',
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error('Send free live gift:', err);
+      setError('Your gift could not be sent. Please try again.');
+    } finally {
+      setGiftBusy(false);
+    }
+  }
+
   const button = { border: 0, borderRadius: 8, padding: '10px 14px', background: '#1877f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
   const muted = { ...button, background: '#eef2f7', color: '#263445' };
   const card = { background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, boxShadow: '0 1px 5px rgba(0,0,0,.07)' };
@@ -227,6 +273,25 @@ export default function LivePanel({ user, profile, onBack }) {
           {activeStream.hostUid === user.uid
             ? <button type="button" style={{ ...button, background: '#c62828', marginTop: 12 }} disabled={busy} onClick={endBroadcast}>End Live</button>
             : <button type="button" style={{ ...muted, marginTop: 12 }} onClick={leaveBroadcast}>Leave Live</button>}
+          <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: '#fff8ed', border: '1px solid #f5dfbd' }}>
+            <h3 style={{ margin: '0 0 10px' }}>Send a free gift</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {freeGifts.map((gift) => (
+                <button key={gift.id} type="button" style={{ ...muted, background: '#fff', border: '1px solid #e8d7bd' }} disabled={giftBusy} onClick={() => sendFreeGift(gift)}>
+                  <span style={{ fontSize: 20, marginRight: 6 }}>{gift.emoji}</span>{gift.name}
+                </button>
+              ))}
+            </div>
+            <p style={{ color: '#8a5a20', fontSize: 12, margin: '9px 0 0' }}>These gifts are free and do not use money or create creator earnings.</p>
+            <div aria-live="polite" style={{ marginTop: 10, display: 'grid', gap: 5 }}>
+              {giftEvents.map((gift) => (
+                <div key={gift.id} style={{ fontSize: 14, color: '#59452e' }}>
+                  <strong>{gift.senderName || 'A member'}</strong> sent {gift.emoji} {gift.giftName}
+                </div>
+              ))}
+              {giftEvents.length === 0 && <span style={{ color: '#8a755d', fontSize: 13 }}>No gifts yet. Be the first to send one!</span>}
+            </div>
+          </div>
           <h3 style={{ marginTop: 18 }}>Live comments</h3>
           <div style={{ maxHeight: 240, overflowY: 'auto', padding: 10, background: '#f7f8fa', borderRadius: 8 }}>
             {comments.map((comment) => <p key={comment.id} style={{ margin: '7px 0', overflowWrap: 'anywhere' }}><strong>{comment.senderName}: </strong>{comment.text}</p>)}
