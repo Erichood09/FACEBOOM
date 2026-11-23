@@ -19,11 +19,13 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin' } });
     if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405, origin);
 
+    let diagnosticStage = 'read_firebase_token';
     try {
       const authorization = request.headers.get('Authorization') || '';
       const idToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
       if (!idToken) return json({ error: 'Sign in to FACEBOOM first.' }, 401, origin);
 
+      diagnosticStage = 'verify_firebase_token';
       let payload;
       let verifiedProjectId = '';
       for (const projectId of FIREBASE_PROJECT_IDS(env)) {
@@ -43,6 +45,7 @@ export default {
       const uid = payload.sub;
       if (!uid || typeof uid !== 'string') return json({ error: 'Invalid account token.' }, 401, origin);
 
+      diagnosticStage = 'read_live_request';
       const body = await request.json();
       const streamId = String(body.streamId || '');
       const mode = body.mode;
@@ -50,10 +53,12 @@ export default {
         return json({ error: 'Invalid live session.' }, 400, origin);
       }
 
+      diagnosticStage = 'load_user_profile';
       const profileResponse = await fetch(`https://firestore.googleapis.com/v1/projects/${verifiedProjectId}/databases/(default)/documents/users/${uid}`, {
         headers: { Authorization: `Bearer ${idToken}` }
       });
       if (!profileResponse.ok) return json({ error: 'Could not verify your FACEBOOM account.' }, 403, origin);
+      diagnosticStage = 'read_user_profile';
       const profileDocument = await profileResponse.json();
       const accountStatus = profileDocument.fields?.accountStatus?.stringValue || 'active';
       const suspensionUntil = profileDocument.fields?.suspensionUntil?.timestampValue || '';
@@ -64,10 +69,12 @@ export default {
         return json({ error: 'Your account cannot join a live broadcast.' }, 403, origin);
       }
 
+      diagnosticStage = 'load_live_stream';
       const streamResponse = await fetch(`https://firestore.googleapis.com/v1/projects/${verifiedProjectId}/databases/(default)/documents/liveStreams/${streamId}`, {
         headers: { Authorization: `Bearer ${idToken}` }
       });
       if (!streamResponse.ok) return json({ error: 'This live broadcast is no longer available.' }, 404, origin);
+      diagnosticStage = 'read_live_stream';
       const streamDocument = await streamResponse.json();
       const streamStatus = streamDocument.fields?.status?.stringValue;
       const hostUid = streamDocument.fields?.hostUid?.stringValue;
@@ -80,12 +87,14 @@ export default {
         return json({ error: 'You are not authorized for this live session.' }, 403, origin);
       }
       if (mode === 'guest') {
+        diagnosticStage = 'verify_guest_approval';
         const guestResponse = await fetch(`https://firestore.googleapis.com/v1/projects/${verifiedProjectId}/databases/(default)/documents/liveStreams/${streamId}/guestRequests/${uid}`, { headers: { Authorization: `Bearer ${idToken}` } });
         if (!guestResponse.ok) return json({ error: 'Guest approval was not found.' }, 403, origin);
         const guestDocument = await guestResponse.json();
         if (guestDocument.fields?.status?.stringValue !== 'approved') return json({ error: 'The host has not approved your guest request.' }, 403, origin);
       }
 
+      diagnosticStage = 'sign_livekit_token_check_secrets';
       const token = await new SignJWT({
         name: profileDocument.fields?.fullName?.stringValue || 'FACEBOOM member',
         video: {
@@ -104,8 +113,8 @@ export default {
         .sign(new TextEncoder().encode(env.LIVEKIT_API_SECRET));
       return json({ token }, 200, origin);
     } catch (error) {
-      console.error('Live token error:', error);
-      return json({ error: 'Unable to authorize this live session.' }, 401, origin);
+      console.error('Live token failure stage:', diagnosticStage, 'error name:', error?.name || 'UnknownError');
+      return json({ error: 'Unable to authorize this live session.', diagnostic: diagnosticStage }, 500, origin);
     }
   }
 };
