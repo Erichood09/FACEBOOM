@@ -16,6 +16,9 @@ export default function LivePanel({ user, profile, onBack }) {
   const [reportReason, setReportReason] = useState('spam');
   const [reportDetails, setReportDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
+  const [guestRequests, setGuestRequests] = useState([]);
+  const [myGuestRequest, setMyGuestRequest] = useState(null);
+  const guestConnectStarted = useRef(false);
   const [heartEvents, setHeartEvents] = useState([]);
   const lastHeartAt = useRef(0);
   const [draft, setDraft] = useState('');
@@ -56,6 +59,28 @@ export default function LivePanel({ user, profile, onBack }) {
   }, [activeStream?.id, activeStream?.hostUid, user.uid]);
 
   useEffect(() => {
+  useEffect(() => {
+    if (!activeStream || activeStream.hostUid !== user.uid) { setGuestRequests([]); return undefined; }
+    return onSnapshot(collection(db, 'liveStreams', activeStream.id, 'guestRequests'), (snapshot) => {
+      setGuestRequests(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    }, (err) => { console.error('Live guest requests:', err); setError('Unable to load guest requests.'); });
+  }, [activeStream?.id, activeStream?.hostUid, user.uid]);
+
+  useEffect(() => {
+    if (!activeStream || activeStream.hostUid === user.uid) { setMyGuestRequest(null); return undefined; }
+    guestConnectStarted.current = false;
+    const requestRef = doc(db, 'liveStreams', activeStream.id, 'guestRequests', user.uid);
+    return onSnapshot(requestRef, async (snapshot) => {
+      const request = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+      setMyGuestRequest(request);
+      if (request?.status === 'approved' && !guestConnectStarted.current && !room) {
+        guestConnectStarted.current = true;
+        try { await connectToStream(activeStream, 'guest'); setStatus('The host approved your request. You have joined the live session as a guest.'); }
+        catch (err) { guestConnectStarted.current = false; setError(err.message || 'Could not join as a guest.'); }
+      }
+    }, (err) => console.error('Your live guest request:', err));
+  }, [activeStream?.id, activeStream?.hostUid, user.uid]);
+
     if (!activeStream) { setComments([]); return undefined; }
     const commentsQuery = query(collection(db, 'liveStreams', activeStream.id, 'comments'), orderBy('createdAt', 'asc'));
     return onSnapshot(commentsQuery, (snapshot) => {
@@ -207,6 +232,25 @@ export default function LivePanel({ user, profile, onBack }) {
       console.error('Join broadcast:', err);
       setError(err.message || 'Could not join this broadcast.');
     } finally { setBusy(false); }
+  }
+
+  async function requestToJoinAsGuest() {
+    if (!activeStream || activeStream.hostUid === user.uid || myGuestRequest?.status === 'pending') return;
+    try {
+      await setDoc(doc(db, 'liveStreams', activeStream.id, 'guestRequests', user.uid), {
+        uid: user.uid, displayName: profile.fullName || user.displayName || 'FACEBOOM member',
+        status: 'pending', createdAt: serverTimestamp()
+      });
+      setStatus('Your request has been sent. Wait for the host to approve it.');
+    } catch (err) { console.error('Request to join live:', err); setError('Could not send your guest request.'); }
+  }
+
+  async function respondToGuestRequest(request, statusValue) {
+    if (!activeStream || activeStream.hostUid !== user.uid || !['approved', 'rejected'].includes(statusValue)) return;
+    try {
+      await updateDoc(doc(db, 'liveStreams', activeStream.id, 'guestRequests', request.uid), { status: statusValue, respondedAt: serverTimestamp() });
+      setStatus(statusValue === 'approved' ? `Approved ${request.displayName} to join.` : `Declined ${request.displayName}'s request.`);
+    } catch (err) { console.error('Respond to guest request:', err); setError('Could not update the guest request.'); }
   }
 
   async function toggleCamera() {
@@ -405,6 +449,24 @@ export default function LivePanel({ user, profile, onBack }) {
             </div>
           </div>
           <button type="button" style={{ ...button, borderRadius: 24, marginTop: 10, background: '#e83e68' }} onClick={sendHeart}>❤️ Send heart</button>
+          {activeStream.hostUid === user.uid ? (
+            <div style={{ marginTop: 14, padding: 12, border: '1px solid #d7e3f5', borderRadius: 9, background: '#f5f9ff' }}>
+              <strong>Guest requests</strong>
+              {guestRequests.filter((request) => request.status === 'pending').length === 0
+                ? <p style={{ margin: '6px 0 0', color: '#687684', fontSize: 13 }}>No pending guest requests.</p>
+                : guestRequests.filter((request) => request.status === 'pending').map((request) => (
+                  <div key={request.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 9 }}>
+                    <span>{request.displayName || 'FACEBOOM member'} wants to join.</span>
+                    <span><button type="button" style={button} onClick={() => respondToGuestRequest(request, 'approved')}>Approve</button><button type="button" style={{ ...muted, marginLeft: 6 }} onClick={() => respondToGuestRequest(request, 'rejected')}>Decline</button></span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div style={{ marginTop: 12 }}>
+              {!room && myGuestRequest?.status !== 'approved' && <button type="button" style={muted} onClick={requestToJoinAsGuest} disabled={myGuestRequest?.status === 'pending'}>{myGuestRequest?.status === 'pending' ? 'Guest request sent — waiting for host' : myGuestRequest?.status === 'rejected' ? 'Request was declined' : '🙋 Request to join on screen'}</button>}
+              {room && <span style={{ color: '#187a3d', fontSize: 13 }}>You are connected as a guest.</span>}
+            </div>
+          )}
           {activeStream.hostUid === user.uid ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               <button type="button" style={muted} onClick={toggleMicrophone}>{microphoneEnabled ? '🎙️ Mute microphone' : '🔇 Turn microphone on'}</button>
