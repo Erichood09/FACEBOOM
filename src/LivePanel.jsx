@@ -13,6 +13,9 @@ export default function LivePanel({ user, profile, onBack }) {
   const [comments, setComments] = useState([]);
   const [giftEvents, setGiftEvents] = useState([]);
   const [giftBusy, setGiftBusy] = useState(false);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
   const [heartEvents, setHeartEvents] = useState([]);
   const lastHeartAt = useRef(0);
   const [draft, setDraft] = useState('');
@@ -336,6 +339,32 @@ export default function LivePanel({ user, profile, onBack }) {
     }
   }
 
+  async function reportLiveBroadcast(event) {
+    event.preventDefault();
+    if (!activeStream || activeStream.hostUid === user.uid || reportBusy) return;
+    setReportBusy(true);
+    setError('');
+    try {
+      await addDoc(collection(db, 'reports'), {
+        reporterId: user.uid,
+        targetUid: activeStream.hostUid,
+        contentType: 'live_stream',
+        contentId: activeStream.id,
+        reason: reportReason,
+        details: reportDetails.trim(),
+        status: 'open',
+        createdAt: serverTimestamp()
+      });
+      setReportDetails('');
+      setStatus('Thank you. Your report has been sent to the FACEBOOM moderation team.');
+    } catch (err) {
+      console.error('Report live broadcast:', err);
+      setError('Your report could not be sent. Please try again.');
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
   const button = { border: 0, borderRadius: 8, padding: '10px 14px', background: '#1877f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
   const muted = { ...button, background: '#eef2f7', color: '#263445' };
   const card = { background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, boxShadow: '0 1px 5px rgba(0,0,0,.07)' };
@@ -409,6 +438,23 @@ export default function LivePanel({ user, profile, onBack }) {
               <small style={{ color: '#536579' }}>— {activeStream.pinnedCommentSenderName || 'FACEBOOM member'}</small>
               {activeStream.hostUid === user.uid && <button type="button" style={{ ...muted, display: 'block', marginTop: 8 }} onClick={() => togglePinnedComment({ text: activeStream.pinnedCommentText, senderName: activeStream.pinnedCommentSenderName })}>Unpin comment</button>}
             </div>
+          )}
+          {activeStream.hostUid !== user.uid && (
+            <form onSubmit={reportLiveBroadcast} style={{ marginTop: 16, padding: 12, border: '1px solid #f0c9c9', borderRadius: 9, background: '#fffafa' }}>
+              <strong style={{ color: '#9b2525' }}>Report this live broadcast</strong>
+              <p style={{ margin: '5px 0 9px', color: '#687684', fontSize: 13 }}>Use this if the broadcast appears to violate FACEBOOM rules. Reports are private.</p>
+              <select value={reportReason} onChange={(event) => setReportReason(event.target.value)} style={{ padding: 9, border: '1px solid #ccd2d8', borderRadius: 7, marginRight: 8 }}>
+                <option value="spam">Spam or scam</option>
+                <option value="harassment">Harassment or bullying</option>
+                <option value="hate">Hateful content</option>
+                <option value="violence">Violence or threats</option>
+                <option value="sexual">Sexual content</option>
+                <option value="privacy">Privacy violation</option>
+                <option value="other">Other</option>
+              </select>
+              <input value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} maxLength={1000} placeholder="Optional details (max 1,000 characters)" style={{ width: '100%', boxSizing: 'border-box', padding: 10, marginTop: 8, border: '1px solid #ccd2d8', borderRadius: 7 }} />
+              <button type="submit" disabled={reportBusy} style={{ ...button, background: '#a52a2a', marginTop: 9 }}>{reportBusy ? 'Sending report...' : 'Submit private report'}</button>
+            </form>
           )}
           <h3 style={{ marginTop: 18 }}>Live comments</h3>
           <div style={{ maxHeight: 240, overflowY: 'auto', padding: 10, background: '#f7f8fa', borderRadius: 8 }}>
