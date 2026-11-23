@@ -33,7 +33,7 @@ export default {
       const body = await request.json();
       const streamId = String(body.streamId || '');
       const mode = body.mode;
-      if (!/^[A-Za-z0-9_-]{1,128}$/.test(streamId) || !['host', 'viewer'].includes(mode)) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(streamId) || !['host', 'viewer', 'guest'].includes(mode)) {
         return json({ error: 'Invalid live session.' }, 400, origin);
       }
 
