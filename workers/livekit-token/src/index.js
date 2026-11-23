@@ -63,8 +63,14 @@ export default {
         return json({ error: 'This broadcast is no longer active.' }, 410, origin);
       }
       const isHost = uid === hostUid;
-      if ((mode === 'host' && !isHost) || (mode === 'viewer' && isHost)) {
+      if ((mode === 'host' && !isHost) || ((mode === 'viewer' || mode === 'guest') && isHost)) {
         return json({ error: 'You are not authorized for this live session.' }, 403, origin);
+      }
+      if (mode === 'guest') {
+        const guestResponse = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/liveStreams/${streamId}/guestRequests/${uid}`, { headers: { Authorization: `Bearer ${idToken}` } });
+        if (!guestResponse.ok) return json({ error: 'Guest approval was not found.' }, 403, origin);
+        const guestDocument = await guestResponse.json();
+        if (guestDocument.fields?.status?.stringValue !== 'approved') return json({ error: 'The host has not approved your guest request.' }, 403, origin);
       }
 
       const token = await new SignJWT({
@@ -72,9 +78,9 @@ export default {
         video: {
           roomJoin: true,
           room: `faceboom-${streamId}`,
-          canPublish: mode === 'host',
+          canPublish: mode === 'host' || mode === 'guest',
           canSubscribe: true,
-          canPublishData: mode === 'host'
+          canPublishData: mode === 'host' || mode === 'guest'
         }
       })
         .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
