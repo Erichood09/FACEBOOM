@@ -98,3 +98,13 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
           projectId: faceboom-46273
           channelId: live
+
+      - name: Deploy Firebase Hosting preview
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
+          projectId: faceboom-46273
+          channelId: pr-${{ github.event.pull_request.number }}
+          expires: 7d
