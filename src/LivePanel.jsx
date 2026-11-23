@@ -20,6 +20,8 @@ export default function LivePanel({ user, profile, onBack }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [room, setRoom] = useState(null);
   const videoHostRef = useRef(null);
   const [mediaTracks, setMediaTracks] = useState([]);
@@ -103,8 +105,10 @@ export default function LivePanel({ user, profile, onBack }) {
         element.playsInline = true;
         element.controls = false;
         element.style.width = '100%';
-        element.style.maxHeight = '420px';
-        element.style.objectFit = 'contain';
+        element.style.height = '68vh';
+        element.style.maxHeight = '720px';
+        element.style.minHeight = '320px';
+        element.style.objectFit = 'cover';
         element.style.background = '#111';
       } else {
         element.autoplay = true;
@@ -153,6 +157,8 @@ export default function LivePanel({ user, profile, onBack }) {
       await nextRoom.connect(livekitUrl, payload.token);
       if (mode === 'host') {
         await nextRoom.localParticipant.enableCameraAndMicrophone();
+        setCameraEnabled(true);
+        setMicrophoneEnabled(true);
         nextRoom.localParticipant.videoTrackPublications.forEach((publication) => {
           if (publication.track) setMediaTracks((all) => [...all, publication.track]);
         });
@@ -198,6 +204,30 @@ export default function LivePanel({ user, profile, onBack }) {
       console.error('Join broadcast:', err);
       setError(err.message || 'Could not join this broadcast.');
     } finally { setBusy(false); }
+  }
+
+  async function toggleCamera() {
+    if (!room || activeStream?.hostUid !== user.uid) return;
+    try {
+      const nextEnabled = !cameraEnabled;
+      await room.localParticipant.setCameraEnabled(nextEnabled);
+      setCameraEnabled(nextEnabled);
+    } catch (err) {
+      console.error('Toggle live camera:', err);
+      setError('Could not change the camera setting.');
+    }
+  }
+
+  async function toggleMicrophone() {
+    if (!room || activeStream?.hostUid !== user.uid) return;
+    try {
+      const nextEnabled = !microphoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(nextEnabled);
+      setMicrophoneEnabled(nextEnabled);
+    } catch (err) {
+      console.error('Toggle live microphone:', err);
+      setError('Could not change the microphone setting.');
+    }
   }
 
   async function leaveBroadcast() {
@@ -313,9 +343,9 @@ export default function LivePanel({ user, profile, onBack }) {
       {status && <p role="status" style={{ color: '#187a3d' }}>{status}</p>}
       {activeStream ? (
         <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-            <div><strong style={{ color: '#d93025' }}>● LIVE</strong><h3>{activeStream.title}</h3><p>Hosted by {activeStream.hostName}</p></div>
-            <strong>👥 {participantCount} connected</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div><strong style={{ color: '#d93025' }}>● LIVE</strong><h3 style={{ margin: '5px 0' }}>{activeStream.title}</h3><p style={{ margin: 0 }}>Hosted by {activeStream.hostName}</p></div>
+            <strong>👥 {participantCount} watching</strong>
           </div>
           <div style={{ position: 'relative' }}>
             <div ref={videoHostRef} style={{ minHeight: 220, background: '#111', borderRadius: 10, overflow: 'hidden', display: 'grid', gap: 4, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', alignItems: 'center' }} />
@@ -326,9 +356,13 @@ export default function LivePanel({ user, profile, onBack }) {
             </div>
           </div>
           <button type="button" style={{ ...button, borderRadius: 24, marginTop: 10, background: '#e83e68' }} onClick={sendHeart}>❤️ Send heart</button>
-          {activeStream.hostUid === user.uid
-            ? <button type="button" style={{ ...button, background: '#c62828', marginTop: 12 }} disabled={busy} onClick={endBroadcast}>End Live</button>
-            : <button type="button" style={{ ...muted, marginTop: 12 }} onClick={leaveBroadcast}>Leave Live</button>}
+          {activeStream.hostUid === user.uid ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              <button type="button" style={muted} onClick={toggleMicrophone}>{microphoneEnabled ? '🎙️ Mute microphone' : '🔇 Turn microphone on'}</button>
+              <button type="button" style={muted} onClick={toggleCamera}>{cameraEnabled ? '📷 Turn camera off' : '📷 Turn camera on'}</button>
+              <button type="button" style={{ ...button, background: '#c62828' }} disabled={busy} onClick={endBroadcast}>End Live</button>
+            </div>
+          ) : <button type="button" style={{ ...muted, marginTop: 12 }} onClick={leaveBroadcast}>Leave Live</button>}
           <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: '#fff8ed', border: '1px solid #f5dfbd' }}>
             <h3 style={{ margin: '0 0 10px' }}>Send a free gift</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
