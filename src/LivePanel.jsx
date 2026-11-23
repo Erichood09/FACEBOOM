@@ -256,6 +256,13 @@ export default function LivePanel({ user, profile, onBack }) {
 
   return (
     <section>
+      <style>{`
+        @keyframes faceboomGiftPop {
+          0% { opacity: 0; transform: translateY(10px) scale(.72); }
+          65% { opacity: 1; transform: translateY(-2px) scale(1.08); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
         <div><h2 style={{ color: '#1877f2', margin: 0 }}>🔴 FACEBOOM Live</h2><p style={{ color: '#687684', margin: '5px 0 0' }}>Broadcast live and watch other members.</p></div>
         <button type="button" style={muted} onClick={onBack}>Back to Home</button>
@@ -285,7 +292,7 @@ export default function LivePanel({ user, profile, onBack }) {
             <p style={{ color: '#8a5a20', fontSize: 12, margin: '9px 0 0' }}>These gifts are free and do not use money or create creator earnings.</p>
             <div aria-live="polite" style={{ marginTop: 10, display: 'grid', gap: 5 }}>
               {giftEvents.map((gift) => (
-                <div key={gift.id} style={{ fontSize: 14, color: '#59452e' }}>
+                <div key={gift.id} style={{ fontSize: 14, color: '#59452e', animation: 'faceboomGiftPop 650ms ease-out both' }}>
                   <strong>{gift.senderName || 'A member'}</strong> sent {gift.emoji} {gift.giftName}
                 </div>
               ))}
