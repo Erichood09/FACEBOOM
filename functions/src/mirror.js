@@ -67,7 +67,7 @@ export function shouldApplyMirrorVersion(currentVersion, incomingVersion) {
 
 // A persistent per-document version record prevents delayed/retried events
 // from resurrecting a deleted document or overwriting a newer mirror value.
-export async function writeVersionedMirrorDocument(db, collection, id, data, versionMillis) {
+export async function writeVersionedMirrorDocument(db, collection, id, data, versionMillis, merge = false) {
   const targetRef = db.doc(`${collection}/${id}`);
   const stateRef = db.doc(`_syncState/${collection}__${id}`);
   return db.runTransaction(async (transaction) => {
@@ -75,7 +75,7 @@ export async function writeVersionedMirrorDocument(db, collection, id, data, ver
     const currentVersion = state.exists ? Number(state.get('versionMillis') || 0) : 0;
     if (!shouldApplyMirrorVersion(currentVersion, versionMillis)) return false;
     if (data === null) transaction.delete(targetRef);
-    else transaction.set(targetRef, data);
+    else transaction.set(targetRef, data, ...(merge ? [{ merge: true }] : []));
     transaction.set(stateRef, { versionMillis, deleted: data === null });
     return true;
   });
