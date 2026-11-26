@@ -86,9 +86,9 @@ export default function MetaInboxPanel({ user }) {
         body: JSON.stringify({ recipientId: selected.psid, text })
       });
       setDraft('');
-      setNotice('Reply sent through Facebook Messenger.');
       await openConversation(selected);
       await loadInbox('messages');
+      setNotice('Reply sent through Facebook Messenger.');
     } catch (err) {
       setError(err.message);
     } finally {
