@@ -413,16 +413,27 @@ video {
     font-size: 23px !important;
     letter-spacing: -0.5px;
   }
+  .fb-header {
+    flex-wrap: wrap !important;
+  }
   .fb-header-actions {
+    width: 100%;
     gap: 5px !important;
-    justify-content: flex-end;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .fb-header-actions::-webkit-scrollbar {
+    display: none;
   }
   .fb-header-actions button {
+    flex: 0 0 auto;
     padding: 7px 9px !important;
     font-size: 12px;
-  }
-  .fb-header-actions button:nth-child(n+4):not(:last-child) {
-    display: none;
+    white-space: nowrap;
   }
   main {
     margin: 12px auto !important;
