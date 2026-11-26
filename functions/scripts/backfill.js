@@ -17,7 +17,7 @@ const PAGE_SIZE = 250;
 
 function timestampKey(value) {
   if (!value || !Number.isFinite(value.seconds) || !Number.isFinite(value.nanoseconds)) return null;
-  const base = new Date(value.seconds * 1000).toISOString().replace(/\\.\\d{3}Z$/, '');
+  const base = new Date(value.seconds * 1000).toISOString().replace(/\.\d{3}Z$/, '');
   return `${base}.${String(value.nanoseconds).padStart(9, '0')}Z`;
 }
 
