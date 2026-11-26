@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The mirror is accessed only by trusted server identities through IAM.
+    // Firebase client SDKs must not read or write any mirror collection.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
