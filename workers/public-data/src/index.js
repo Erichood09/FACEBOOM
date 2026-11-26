@@ -43,7 +43,7 @@ export function decodeFirestoreFields(fields = {}) {
 }
 
 export function filterBlockedItems(items, ownBlockedIds, blockedByIds, viewerUid, key = 'authorId') {
-  const hidden = new Set([...ownBlockedIds, ...blockedByIds, viewerUid]);
+  const hidden = new Set([...ownBlockedIds, ...blockedByIds]);
   return items.filter((item) => item[key] && !hidden.has(item[key]));
 }
 
@@ -159,10 +159,11 @@ async function loadViewerContext(uid, projectId, accessToken) {
   ]);
   if (!userDocument) return { error: 'FACEBOOM account was not found.', status: 403 };
   const user = decodeFirestoreFields(userDocument.fields || {});
-  const suspended = user.accountStatus === 'suspended'
-    && user.suspensionUntil
-    && Date.parse(user.suspensionUntil) > Date.now();
-  if (user.accountStatus === 'banned' || suspended || !['active', 'suspended'].includes(user.accountStatus)) {
+  const active = user.accountStatus === 'active'
+    || (user.accountStatus === 'suspended'
+      && user.suspensionUntil
+      && Date.parse(user.suspensionUntil) <= Date.now());
+  if (!active) {
     return { error: 'This account cannot access the public feed or directory.', status: 403 };
   }
   return {
@@ -275,7 +276,7 @@ export default {
           auth.blockedByIds,
           auth.uid,
           'uid'
-        );
+        ).filter((profile) => profile.uid !== auth.uid);
         return json({ profiles: profiles.slice(0, PAGE_SIZE) }, 200, origin);
       }
 
