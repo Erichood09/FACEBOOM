@@ -331,23 +331,47 @@ function App() {
     let active = true;
     setSharedProfileLoading(true);
     setSharedProfileError('');
-    getDoc(doc(db, 'publicProfiles', profileUid))
-      .then((snapshot) => {
+    async function loadSharedProfile() {
+      try {
+        const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+        let profileData = null;
+        if (secureDataApi) {
+          const token = await user.getIdToken();
+          const baseUrl = secureDataApi.endsWith('/') ? secureDataApi.slice(0, -1) : secureDataApi;
+          const response = await fetch(`${baseUrl}/v1/profile/${encodeURIComponent(profileUid)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            if (response.status === 404) {
+              setSharedProfile(null);
+              setSharedProfileError('This profile is not available.');
+              return;
+            }
+            throw new Error(result.error || 'Secure profile request failed.');
+          }
+          profileData = result.profile || null;
+        } else {
+          // Temporary compatibility path until the isolated mirror is deployed.
+          const snapshot = await getDoc(doc(db, 'publicProfiles', profileUid));
+          profileData = snapshot.exists() ? { uid: profileUid, ...snapshot.data() } : null;
+        }
         if (!active) return;
-        if (snapshot.exists()) {
-          setSharedProfile({ uid: profileUid, ...snapshot.data() });
+        if (profileData) {
+          setSharedProfile(profileData);
         } else {
           setSharedProfile(null);
           setSharedProfileError('This profile is not available.');
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Load shared profile:', err);
         if (active) setSharedProfileError('Unable to open this profile right now.');
-      })
-      .finally(() => {
+      } finally {
         if (active) setSharedProfileLoading(false);
-      });
+      }
+    }
+    loadSharedProfile();
 
     return () => { active = false; };
   }, [user]);
