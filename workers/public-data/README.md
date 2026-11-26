@@ -1,34 +1,32 @@
-# FACEBOOM public data security Worker
+# FACEBOOM public-data Worker
 
-This read-only Cloudflare Worker is designed to become the trusted read path for the public post feed and Find Friends directory.
+This Worker is intended to serve the authenticated news feed and public member directory without allowing browser clients to enumerate the production Firestore collections.
 
-## Why it exists
+## Security architecture
 
-Firestore Security Rules cannot filter a collection query result by dynamically checking every author's block relationship. The browser must not be trusted to filter blocked members after downloading their posts or profiles. This Worker authenticates the Firebase ID token, reads the viewer's account and both directions of their block relationships with a narrowly permissioned Google service account, then removes hidden members before returning public data.
+**Do not deploy the current Worker implementation.** Its current code reads the production project's user documents, block subcollections, posts, and publicProfiles using one Google service credential. Even if the code requests only those paths, the credential's Firestore IAM permissions are not collection-scoped.
 
-## Endpoints
+The approved direction is an isolated public-data mirror project. See [PUBLIC_DATA_ISOLATION_PLAN.md](../../PUBLIC_DATA_ISOLATION_PLAN.md) for the complete schema, event-sync requirements, IAM boundaries, and cutover sequence.
 
-- `GET /v1/health` — non-sensitive service health.
-- `GET /v1/feed` — newest 100 posts after excluding the viewer, members they blocked, and members who blocked them. An opaque cursor is returned when another page exists.
-- `GET /v1/directory` — up to 100 public profiles after the same exclusion rules.
+The target Worker must:
+- Verify Firebase ID tokens against the authentication project `faceboom-46273`.
+- Read all Firestore data exclusively from the separate public-data project.
+- Read only `posts`, `publicProfiles`, and the requesting member's `viewerAccess/{uid}` record in that isolated project.
+- Never possess a credential or IAM role in the production source project.
+- Fail closed when authentication, viewer access, or block filtering cannot be verified.
 
-All data responses require a Firebase ID token in the Authorization header. Only exact origins in `FACEBOOM_ORIGINS` are accepted. Responses are marked `no-store`.
+## Existing endpoints
 
-## Required configuration (not deployed by this change)
+- `GET /v1/health` — non-sensitive health check.
+- `GET /v1/feed` — newest 100 posts, excluding the viewer and either direction of blocked relationships; returns an opaque cursor when another page exists.
+- `GET /v1/directory` — up to 100 public profiles with the same block filtering.
 
-1. Create a dedicated Google Cloud service account for this Worker.
-2. Grant it a read-only Firestore role (for example, `roles/datastore.viewer`); never grant project Owner or Editor. **Important limitation:** Google Firestore IAM read roles are not collection-scoped. This credential can potentially read other Firestore documents in the project if compromised, even though this Worker code only requests the public feed, public profiles, the signed-in user's account status, and that user's block records. A custom role can narrow the allowed read operations, but it still does not isolate those permissions to selected collections. Treat this as a privileged secret and do not deploy until the project owner explicitly accepts this residual risk or a separate public-data database/backend is chosen.
-3. Store the service-account JSON as the Cloudflare Worker secret `FIREBASE_SERVICE_ACCOUNT_JSON`. Never commit it, place it in Vite variables, or send it in chat.
-4. Set `FIREBASE_PROJECT_ID=faceboom-46273` and `FACEBOOM_ORIGINS` to the exact production and approved preview origins.
-5. Deploy the Worker and configure its URL as `VITE_PUBLIC_DATA_API_URL` in the web build.
-6. Only after the Worker is deployed and verified should Firestore `list` access for `posts` and `publicProfiles` be denied to browser clients.
+Data endpoints require a Firebase ID token in the Authorization header. Only exact origins in `FACEBOOM_ORIGINS` are accepted. Responses use `Cache-Control: no-store`.
 
-The service-account key is a sensitive credential. Prefer a dedicated account, minimal IAM permissions, key rotation, and Cloudflare secrets. Do not deploy or create a key until the project owner is ready to configure it.
+## Deployment status
 
-## Safety boundaries
-
-- This Worker is read-only; it does not create, update, or delete Firestore documents.
-- It never returns the viewer's private profile, block records, or account details.
-- It fails closed if authentication, account-state, or block-list checks fail.
-- The first version intentionally limits directory output to 100 profiles and feed reads to 100 posts per page. Search and full pagination can be added after the secure path is live and measured.
-- Do not close the existing Firestore list rules until the client has been switched to this Worker and its production endpoint is confirmed. Otherwise the feed and directory would stop loading.
+- The present code is retained for test coverage and migration work only.
+- It is **not approved for deployment** and must be refactored to the isolated mirror schema before any cloud deployment.
+- Do not create or upload a service-account JSON key. Prefer attached runtime identities / Application Default Credentials for the synchronizer and a narrowly scoped identity in the mirror project for the Worker.
+- No cloud project, billing setting, secret, production Firestore rule, or production Hosting configuration is changed by this repository preparation.
+- Do not deny source-project browser list access to `posts` or `publicProfiles` until the isolated mirror, synchronizer, Worker, web configuration, and end-to-end verification are complete.
