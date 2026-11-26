@@ -1,32 +1,49 @@
 # FACEBOOM public-data Worker
 
-This Worker is intended to serve the authenticated news feed and public member directory without allowing browser clients to enumerate the production Firestore collections.
+This Worker is a read-only public-data API for the FACEBOOM website. It must only be deployed after the isolated public-data Firebase project has been created, populated, and permissioned.
 
-## Security architecture
+## Security boundary
 
-**Do not deploy the current Worker implementation.** Its current code reads the production project's user documents, block subcollections, posts, and publicProfiles using one Google service credential. Even if the code requests only those paths, the credential's Firestore IAM permissions are not collection-scoped.
+- Firebase ID tokens are verified against `FIREBASE_AUTH_PROJECT_ID` (the source authentication project, currently `faceboom-46273`).
+- Every Firestore read is made against `FIREBASE_PUBLIC_DATA_PROJECT_ID`.
+- Those project IDs must be different. The Worker returns HTTP 503 if the mirror project is missing or matches the authentication project.
+- The Worker service-account identity must have read access only in the isolated mirror project. Never grant it any role in `faceboom-46273`.
+- Configure the service-account JSON as the Cloudflare secret `FIREBASE_SERVICE_ACCOUNT_JSON`. It must belong to an identity created in the isolated mirror project. Never commit it, put it in a Vite variable, or paste it into chat.
+- The mirror project must contain only the allowlisted public collections and the minimum private access metadata required by the Worker. Firestore client rules in that project must deny all client access to `viewerAccess` and `blockEdges`.
+- The service-account key is a Cloudflare Worker secret, not a browser credential. Rotate it if it is ever exposed.
 
-The approved direction is an isolated public-data mirror project. See [PUBLIC_DATA_ISOLATION_PLAN.md](../../PUBLIC_DATA_ISOLATION_PLAN.md) for the complete schema, event-sync requirements, IAM boundaries, and cutover sequence.
+Google Firestore's standard data-viewer IAM role is project-scoped, not collection-scoped. This is why the Worker must never have a credential in the production source project. Keep the isolated mirror project limited to the approved mirror collections.
 
-The target Worker must:
-- Verify Firebase ID tokens against the authentication project `faceboom-46273`.
-- Read all Firestore data exclusively from the separate public-data project.
-- Read only `posts`, `publicProfiles`, and the requesting member's `viewerAccess/{uid}` record in that isolated project.
-- Never possess a credential or IAM role in the production source project.
-- Fail closed when authentication, viewer access, or block filtering cannot be verified.
+## Endpoints
 
-## Existing endpoints
+All endpoints except the health check require an Authorization Bearer Firebase ID token and an allowed browser Origin.
 
-- `GET /v1/health` — non-sensitive health check.
-- `GET /v1/feed` — newest 100 posts, excluding the viewer and either direction of blocked relationships; returns an opaque cursor when another page exists.
-- `GET /v1/directory` — up to 100 public profiles with the same block filtering.
+- `GET /v1/health`: reports whether the isolated project IDs are configured; it does not verify Firestore connectivity.
+- `GET /v1/feed`: returns public posts, excluding the viewer's own blocked users and users who blocked the viewer.
+- `GET /v1/directory`: returns up to 100 public profiles, with the same block filtering.
+- `GET /v1/profile/{uid}`: returns one public profile unless it is the viewer's own profile or a blocked relationship exists.
 
-Data endpoints require a Firebase ID token in the Authorization header. Only exact origins in `FACEBOOM_ORIGINS` are accepted. Responses use `Cache-Control: no-store`.
+Responses use `Cache-Control: no-store`. The feed includes an opaque `nextCursor`; the current website does not yet request subsequent pages.
 
-## Deployment status
+## Required Worker configuration
 
-- The present code is retained for test coverage and migration work only.
-- It is **not approved for deployment** and must be refactored to the isolated mirror schema before any cloud deployment.
-- Do not create or upload a service-account JSON key. Prefer attached runtime identities / Application Default Credentials for the synchronizer and a narrowly scoped identity in the mirror project for the Worker.
-- No cloud project, billing setting, secret, production Firestore rule, or production Hosting configuration is changed by this repository preparation.
-- Do not deny source-project browser list access to `posts` or `publicProfiles` until the isolated mirror, synchronizer, Worker, web configuration, and end-to-end verification are complete.
+Set these non-secret variables in Cloudflare:
+
+- `FIREBASE_AUTH_PROJECT_ID=faceboom-46273`
+- `FIREBASE_PUBLIC_DATA_PROJECT_ID=<the separate mirror project ID>`
+- `FACEBOOM_ORIGINS=https://faceboom-46273.web.app` (add the approved production domain only when ready)
+
+Set `FIREBASE_SERVICE_ACCOUNT_JSON` as a Cloudflare secret using the mirror-project-only read identity.
+
+Do not deploy with the blank mirror project ID in `wrangler.toml`.
+
+## Deployment gate
+
+Do not deploy this Worker until:
+1. The separate mirror project exists and Firestore is enabled.
+2. The source-project synchronizer is deployed with a runtime identity authorized to write to the mirror.
+3. A controlled backfill has populated profiles, posts, viewer access, and block relationships.
+4. The Worker identity exists only in the mirror project and has the required read access.
+5. The website and Worker have been tested against non-production data.
+
+No production Worker, website, or Firestore rules deployment is authorized by this repository preparation work.
