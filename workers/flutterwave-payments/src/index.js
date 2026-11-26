@@ -184,7 +184,9 @@ export default {
         const txRef = event?.data?.tx_ref;
         if (!transactionId || !txRef) return json({ received: true }, 200, origin);
         const result = await verifyAndCredit(String(transactionId), String(txRef), null, env);
-        if (result.error && result.status >= 500) return json({ error: result.error }, 500, origin);
+        if (result.error && (result.status >= 500 || result.status === 409)) {
+          return json({ error: result.error }, 500, origin);
+        }
         if (result.error) return json({ received: true, ignored: true }, 200, origin);
         return json({ received: true }, 200, origin);
       } catch (error) {
