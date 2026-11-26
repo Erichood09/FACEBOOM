@@ -72,7 +72,7 @@ function App() {
   const [showModerator, setShowModerator] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showWallet, setShowWallet] = useState(false);
+  const [showWallet, setShowWallet] = useState(() => new URLSearchParams(window.location.search).get('wallet') === 'return');
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
   const [accountCheckComplete, setAccountCheckComplete] = useState(false);
