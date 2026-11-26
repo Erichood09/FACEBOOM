@@ -1179,12 +1179,12 @@ function App() {
   return (
     <div style={homePageStyle}>
 
-      <header style={headerStyle}>
+      <header className="fb-header" style={headerStyle}>
         <h1 style={{ color: '#1877f2', margin: 0 }}>
           FACEBOOM
         </h1>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="fb-header-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             style={headerButtonStyle}
             onClick={() => {
@@ -1873,6 +1873,30 @@ function App() {
           </>
         )}
       </main>
+
+      <nav className="fb-mobile-nav" aria-label="Main navigation">
+        <button type="button" className={!showProfile && !showFriends && !showMessages && !showNotifications && !showWallet && !showLive && !showModerator ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowMessages(false); setShowModerator(false); setShowLive(false); setEditingProfile(false);
+        }}><span aria-hidden="true">⌂</span><small>Home</small></button>
+        <button type="button" className={showFriends ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowMessages(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowFriends(true);
+        }}><span aria-hidden="true">♧</span><small>Friends</small></button>
+        <button type="button" className={showMessages ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowMessages(true);
+        }}><span aria-hidden="true">✉</span><small>Messages</small></button>
+        <button type="button" className={showNotifications ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowWallet(false); setShowFriends(false); setShowMessages(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowNotifications(true);
+        }}><span aria-hidden="true">♢</span><small>Alerts</small></button>
+        <button type="button" className={showProfile ? 'active' : ''} onClick={() => {
+          setShowProfile(true); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowMessages(false); setShowModerator(false); setShowLive(false); setEditingProfile(false);
+          setProfileMessage(''); setProfileError('');
+        }}><span aria-hidden="true">●</span><small>Profile</small></button>
+      </nav>
     </div>
   );
 }
