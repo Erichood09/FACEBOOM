@@ -6,7 +6,8 @@ import {
   applyBlockEdge,
   normalizeAccountStatus,
   publicPost,
-  publicProfile
+  publicProfile,
+  writeVersionedMirrorDocument
 } from './src/mirror.js';
 
 const publicDataProjectId = defineString('PUBLIC_DATA_PROJECT_ID');
@@ -33,39 +34,21 @@ export const mirrorPublicProfile = onDocumentWritten(
   async (event) => {
     const uid = event.params.uid;
     const after = event.data?.after;
-    const ref = mirrorDb().doc(`publicProfiles/${uid}`);
     if (!after?.exists) {
-      await ref.delete().catch((error) => {
-        if (error.code !== 5) throw error;
-      });
+      await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, null, eventMillis(event));
       return;
     }
     const safe = publicProfile(after.data(), uid);
-    if (!safe) {
-      await ref.delete();
-      return;
-    }
-    await ref.set(safe);
+    await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, safe, eventMillis(event));
   }
 );
 
 export const mirrorPublicPost = onDocumentWritten(
   { document: 'posts/{postId}', region: 'us-central1', retry: true },
   async (event) => {
-    const ref = mirrorDb().doc(`posts/${event.params.postId}`);
     const after = event.data?.after;
-    if (!after?.exists) {
-      await ref.delete().catch((error) => {
-        if (error.code !== 5) throw error;
-      });
-      return;
-    }
-    const safe = publicPost(after.data());
-    if (!safe) {
-      await ref.delete();
-      return;
-    }
-    await ref.set(safe);
+    const safe = after?.exists ? publicPost(after.data()) : null;
+    await writeVersionedMirrorDocument(mirrorDb(), 'posts', event.params.postId, safe, eventMillis(event));
   }
 );
 
@@ -75,17 +58,14 @@ export const mirrorAccountAccess = onDocumentWritten(
     const uid = event.params.uid;
     const after = event.data?.after;
     if (!after?.exists) {
-      await mirrorDb().doc(`viewerAccess/${uid}`).delete().catch((error) => {
-        if (error.code !== 5) throw error;
-      });
+      await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, null, eventMillis(event));
       return;
     }
     const account = normalizeAccountStatus(after.data());
-    const ref = mirrorDb().doc(`viewerAccess/${uid}`);
-    await ref.set({
+    await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, {
       ...account,
       updatedAt: new Date(eventMillis(event))
-    }, { merge: true });
+    }, eventMillis(event));
   }
 );
 
