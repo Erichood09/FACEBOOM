@@ -120,7 +120,7 @@ for (const [uid, state] of access.entries()) {
   for (const blockedUid of state.ownBlockedIds) {
     edgeWrites.push([
       mirrorDb.doc(`blockEdges/${uid}__${blockedUid}`),
-      { blockerUid: uid, blockedUid, exists: true, eventMillis: Date.now() }
+      { blockerUid: uid, blockedUid, exists: true, eventMillis: 0 }
     ]);
   }
 }
