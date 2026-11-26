@@ -79,5 +79,7 @@ test('mirror event versions reject stale and duplicate deliveries', () => {
   assert.equal(shouldApplyMirrorVersion('2026-11-26T10:00:00.123456Z', '2026-11-26T10:00:00.123457Z'), true);
   assert.equal(shouldApplyMirrorVersion('2026-11-26T10:00:00.123457Z', '2026-11-26T10:00:00.123456Z'), false);
   assert.equal(shouldApplyMirrorVersion('2026-11-26T10:00:00.123457Z', '2026-11-26T10:00:00.123457Z'), false);
+  assert.equal(shouldApplyMirrorVersion('2026-11-26T10:00:00.123456Z', '2026-11-26T10:00:00.123456000Z'), false);
+  assert.equal(shouldApplyMirrorVersion('2026-11-26T10:00:00.123456000Z', '2026-11-26T10:00:00.123456001Z'), true);
   assert.equal(shouldApplyMirrorVersion(null, ''), false);
 });
