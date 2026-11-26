@@ -15,6 +15,8 @@ import { uploadToCloudinary } from './cloudinary';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  FacebookAuthProvider,
+  signInWithPopup,
   sendPasswordResetEmail,
   onAuthStateChanged,
   getIdTokenResult,
@@ -48,6 +50,7 @@ function App() {
 
   const [error, setError] = useState('');
   const [passwordResetMessage, setPasswordResetMessage] = useState('');
+  const [facebookBusy, setFacebookBusy] = useState(false);
 
   const [profile, setProfile] = useState({
     fullName: '',
@@ -681,6 +684,68 @@ function App() {
     }
   }
 
+  // SIGN IN OR REGISTER USING FACEBOOK THROUGH FIREBASE AUTH.
+  // The Facebook provider must first be enabled in Firebase Console.
+  async function handleFacebookAuth() {
+    if (facebookBusy) return;
+    setFacebookBusy(true);
+    setError('');
+    setPasswordResetMessage('');
+    try {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      const result = await signInWithPopup(auth, provider);
+      const facebookUser = result.user;
+      const profileRef = doc(db, 'users', facebookUser.uid);
+      const existingProfile = await getDoc(profileRef);
+
+      if (!existingProfile.exists()) {
+        const displayName = facebookUser.displayName || 'FACEBOOM Member';
+        const usernameBase = displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const newProfile = {
+          fullName: displayName,
+          username: usernameBase || ('user_' + facebookUser.uid.slice(0, 8)),
+          country: 'Nigeria',
+          bio: '',
+          photoURL: facebookUser.photoURL || '',
+          coverPhotoURL: ''
+        };
+        await setDoc(profileRef, {
+          ...newProfile,
+          email: facebookUser.email || '',
+          accountStatus: 'active',
+          createdAt: new Date().toISOString()
+        });
+        try {
+          await setDoc(doc(db, 'publicProfiles', facebookUser.uid), {
+            uid: facebookUser.uid,
+            ...newProfile,
+            updatedAt: serverTimestamp()
+          });
+        } catch (directoryError) {
+          console.warn('Could not create Facebook sign-in profile directory entry:', directoryError);
+        }
+      }
+    } catch (err) {
+      console.error('Facebook sign-in failed:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Facebook sign-in is not enabled in Firebase yet. The administrator must enable the Facebook provider and add its Meta App credentials.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This website domain is not yet authorised for Facebook sign-in in Firebase.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Your browser blocked the Facebook sign-in window. Allow pop-ups for FACEBOOM and try again.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Facebook sign-in was cancelled before it finished.');
+      } else if (err.code === 'auth/account-exists-with-different-credential') {
+        setError('An account already uses this email with another sign-in method. Log in with that method first.');
+      } else {
+        setError('Facebook sign-in could not be completed. Check the Facebook app and Firebase provider setup, then try again.');
+      }
+    } finally {
+      setFacebookBusy(false);
+    }
+  }
+
   async function submitAppeal(event) {
     event.preventDefault();
     const reason = appealText.trim();
@@ -1112,6 +1177,23 @@ function App() {
               {registering ? 'Sign Up' : 'Log In'}
             </button>
           </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0', color: '#65676b', fontSize: 13 }}>
+            <span style={{ flex: 1, height: 1, background: '#ddd' }} />
+            OR
+            <span style={{ flex: 1, height: 1, background: '#ddd' }} />
+          </div>
+          <button
+            type="button"
+            onClick={handleFacebookAuth}
+            disabled={facebookBusy}
+            style={{ ...primaryButtonStyle, background: '#1877f2', opacity: facebookBusy ? 0.7 : 1 }}
+          >
+            {facebookBusy ? 'Connecting to Facebook...' : 'Continue with Facebook'}
+          </button>
+          <p style={{ color: '#65676b', fontSize: 12, marginTop: 8 }}>
+            Facebook sign-in connects your FACEBOOM account. It does not give FACEBOOM access to your personal Messenger inbox.
+          </p>
 
           <p style={{ marginTop: 20 }}>
             {registering
