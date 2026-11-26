@@ -61,7 +61,7 @@ async function authenticateModerator(request, env) {
 }
 
 function isPageScopedId(value) {
-  return typeof value === 'string' && /^\\d{5,30}$/.test(value);
+  return typeof value === 'string' && /^\d{5,30}$/.test(value);
 }
 
 function cleanText(value) {
@@ -163,7 +163,7 @@ async function handleApi(request, env, url, origin) {
 
   if (request.method === 'GET' && url.pathname === '/v1/meta/conversation') {
     const psid = String(url.searchParams.get('psid') || '');
-    if (!/^\\d{5,30}$/.test(psid)) return json({ error: 'Invalid Messenger conversation.' }, 400, origin);
+    if (!isPageScopedId(psid)) return json({ error: 'Invalid Messenger conversation.' }, 400, origin);
     const result = await env.META_DB.prepare(
       'SELECT message_id, psid, direction, message_text, created_at, delivery_status FROM meta_messages WHERE psid = ? ORDER BY created_at ASC LIMIT 100'
     ).bind(psid).all();
@@ -189,7 +189,7 @@ async function handleApi(request, env, url, origin) {
     const body = await request.json().catch(() => ({}));
     const recipientId = String(body.recipientId || '');
     const message = cleanText(body.text);
-    if (!/^\d{5,30}$/.test(recipientId) || !message) return json({ error: 'Enter a valid Messenger recipient and message.' }, 400, origin);
+    if (!isPageScopedId(recipientId) || !message) return json({ error: 'Enter a valid Messenger recipient and message.' }, 400, origin);
     try {
       const result = await graphRequest('me/messages', {
         recipient: { id: recipientId },
