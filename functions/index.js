@@ -65,7 +65,7 @@ export const mirrorAccountAccess = onDocumentWritten(
     await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, {
       ...account,
       updatedAt: new Date(eventMillis(event))
-    }, eventMillis(event));
+    }, eventMillis(event), true);
   }
 );
 
