@@ -6,6 +6,7 @@ import SafetyActions from './SafetyActions';
 import ShareActions from './ShareActions';
 import ModeratorPanel from './ModeratorPanel';
 import LivePanel from './LivePanel';
+import NotificationsPanel from './NotificationsPanel';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -69,6 +70,7 @@ function App() {
   const [showMessages, setShowMessages] = useState(false);
   const [showModerator, setShowModerator] = useState(false);
   const [showLive, setShowLive] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
   const [accountCheckComplete, setAccountCheckComplete] = useState(false);
@@ -312,12 +314,14 @@ function App() {
       setSharedProfile(null);
       setSharedProfileError('');
       setShowProfile(true);
+              setShowNotifications(false);
       setShowFriends(false);
       setShowMessages(false);
       return undefined;
     }
 
     setShowProfile(false);
+              setShowNotifications(false);
     setShowFriends(false);
     setShowMessages(false);
     let active = true;
@@ -636,6 +640,7 @@ function App() {
     try {
       await signOut(auth);
       setShowProfile(false);
+              setShowNotifications(false);
       setShowFriends(false);
       setShowMessages(false);
       setShowModerator(false);
@@ -1114,6 +1119,7 @@ function App() {
             style={headerButtonStyle}
             onClick={() => {
               setShowProfile(false);
+              setShowNotifications(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1128,6 +1134,7 @@ function App() {
             style={headerButtonStyle}
             onClick={() => {
               setShowProfile(true);
+              setShowNotifications(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1144,6 +1151,7 @@ function App() {
             style={headerButtonStyle}
             onClick={() => {
               setShowProfile(false);
+              setShowNotifications(false);
               setShowMessages(false);
               setShowModerator(false);
               setShowLive(false);
@@ -1158,6 +1166,23 @@ function App() {
             style={headerButtonStyle}
             onClick={() => {
               setShowProfile(false);
+              setShowNotifications(false);
+              setShowFriends(false);
+              setShowMessages(false);
+              setShowModerator(false);
+              setShowLive(false);
+              setShowNotifications(true);
+              setEditingProfile(false);
+            }}
+          >
+            Notifications
+          </button>
+
+          <button
+            style={headerButtonStyle}
+            onClick={() => {
+              setShowProfile(false);
+              setShowNotifications(false);
               setShowFriends(false);
               setShowMessages(true);
               setShowModerator(false);
@@ -1172,6 +1197,7 @@ function App() {
             style={headerButtonStyle}
             onClick={() => {
               setShowProfile(false);
+              setShowNotifications(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1187,6 +1213,7 @@ function App() {
               style={headerButtonStyle}
               onClick={() => {
                 setShowProfile(false);
+              setShowNotifications(false);
                 setShowFriends(false);
                 setShowMessages(false);
                 setShowModerator(true);
@@ -1259,6 +1286,8 @@ function App() {
               url={`${window.location.origin}${window.location.pathname}?profile=${sharedProfile.uid}`}
             />
           </div>
+        ) : showNotifications ? (
+          <NotificationsPanel user={user} onBack={() => setShowNotifications(false)} />
         ) : showModerator && isModerator ? (
           <ModeratorPanel user={user} onBack={() => setShowModerator(false)} />
         ) : showLive ? (
