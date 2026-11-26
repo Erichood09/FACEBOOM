@@ -694,38 +694,8 @@ function App() {
     try {
       const provider = new FacebookAuthProvider();
       provider.addScope('email');
-      const result = await signInWithPopup(auth, provider);
-      const facebookUser = result.user;
-      const profileRef = doc(db, 'users', facebookUser.uid);
-      const existingProfile = await getDoc(profileRef);
-
-      if (!existingProfile.exists()) {
-        const displayName = facebookUser.displayName || 'FACEBOOM Member';
-        const usernameBase = displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const newProfile = {
-          fullName: displayName,
-          username: usernameBase || ('user_' + facebookUser.uid.slice(0, 8)),
-          country: 'Nigeria',
-          bio: '',
-          photoURL: facebookUser.photoURL || '',
-          coverPhotoURL: ''
-        };
-        await setDoc(profileRef, {
-          ...newProfile,
-          email: facebookUser.email || '',
-          accountStatus: 'active',
-          createdAt: new Date().toISOString()
-        });
-        try {
-          await setDoc(doc(db, 'publicProfiles', facebookUser.uid), {
-            uid: facebookUser.uid,
-            ...newProfile,
-            updatedAt: serverTimestamp()
-          });
-        } catch (directoryError) {
-          console.warn('Could not create Facebook sign-in profile directory entry:', directoryError);
-        }
-      }
+      // The existing auth-state profile loader creates a FACEBOOM profile for new members.
+      await signInWithPopup(auth, provider);
     } catch (err) {
       console.error('Facebook sign-in failed:', err);
       if (err.code === 'auth/operation-not-allowed') {
