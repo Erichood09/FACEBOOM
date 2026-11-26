@@ -17,7 +17,7 @@ All data responses require a Firebase ID token in the Authorization header. Only
 ## Required configuration (not deployed by this change)
 
 1. Create a dedicated Google Cloud service account for this Worker.
-2. Grant it only the Firestore read-only role needed to read the FACEBOOM database (for example, `roles/datastore.viewer`). Do not grant project Owner or Editor.
+2. Grant it a read-only Firestore role (for example, `roles/datastore.viewer`); never grant project Owner or Editor. **Important limitation:** Google Firestore IAM read roles are not collection-scoped. This credential can potentially read other Firestore documents in the project if compromised, even though this Worker code only requests the public feed, public profiles, the signed-in user's account status, and that user's block records. A custom role can narrow the allowed read operations, but it still does not isolate those permissions to selected collections. Treat this as a privileged secret and do not deploy until the project owner explicitly accepts this residual risk or a separate public-data database/backend is chosen.
 3. Store the service-account JSON as the Cloudflare Worker secret `FIREBASE_SERVICE_ACCOUNT_JSON`. Never commit it, place it in Vite variables, or send it in chat.
 4. Set `FIREBASE_PROJECT_ID=faceboom-46273` and `FACEBOOM_ORIGINS` to the exact production and approved preview origins.
 5. Deploy the Worker and configure its URL as `VITE_PUBLIC_DATA_API_URL` in the web build.
