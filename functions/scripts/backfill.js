@@ -15,6 +15,12 @@ const sourceDb = getFirestore(sourceApp);
 const mirrorDb = getFirestore(mirrorApp);
 const PAGE_SIZE = 250;
 
+function timestampKey(value) {
+  if (!value || !Number.isFinite(value.seconds) || !Number.isFinite(value.nanoseconds)) return null;
+  const base = new Date(value.seconds * 1000).toISOString().replace(/\\.\\d{3}Z$/, '');
+  return `${base}.${String(value.nanoseconds).padStart(9, '0')}Z`;
+}
+
 async function forEachDocument(collectionRef, callback) {
   let cursor = null;
   while (true) {
@@ -67,7 +73,7 @@ async function copyCollection(sourceName, targetName, transform) {
   await forEachDocument(sourceDb.collection(sourceName), async (document) => {
     const safe = transform(document.data(), document.id);
     if (!safe) return;
-    const sourceVersion = document.updateTime;
+    const sourceVersion = timestampKey(document.updateTime);
     batch.set(mirrorDb.doc(`${targetName}/${document.id}`), safe, { merge: true });
     if (sourceVersion) {
       batch.set(mirrorDb.doc(`_syncState/${targetName}__${document.id}`), { versionKey: sourceVersion, deleted: false });
@@ -75,7 +81,7 @@ async function copyCollection(sourceName, targetName, transform) {
     }
     copied += 1;
     pending += 1;
-    if (pending === 450) {
+    if (pending >= 450) {
       await batch.commit();
       batch = mirrorDb.batch();
       pending = 0;
@@ -97,7 +103,8 @@ await forEachDocument(sourceDb.collection('users'), async (document) => {
   const uid = document.id;
   const status = normalizeAccountStatus(document.data());
   Object.assign(accessFor(uid), status, { updatedAt: new Date() });
-  if (document.updateTime) userVersions.set(uid, document.updateTime);
+  const userVersion = timestampKey(document.updateTime);
+  if (userVersion) userVersions.set(uid, userVersion);
   userCount += 1;
 
   await forEachDocument(
@@ -107,7 +114,8 @@ await forEachDocument(sourceDb.collection('users'), async (document) => {
       if (blockedUid === uid) return;
       accessFor(uid).ownBlockedIds.add(blockedUid);
       accessFor(blockedUid).blockedByIds.add(uid);
-      if (blockedDocument.updateTime) blockVersions.set(`${uid}__${blockedUid}`, blockedDocument.updateTime);
+      const blockVersion = timestampKey(blockedDocument.updateTime);
+      if (blockVersion) blockVersions.set(`${uid}__${blockedUid}`, blockVersion);
       blockCount += 1;
     }
   );
