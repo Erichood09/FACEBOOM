@@ -57,7 +57,7 @@ export const mirrorPublicPost = onDocumentWritten(
   async (event) => {
     const after = event.data?.after;
     const safe = after?.exists ? publicPost(after.data()) : null;
-    await writeVersionedMirrorDocument(mirrorDb(), 'posts', event.params.postId, safe, eventMillis(event));
+    await writeVersionedMirrorDocument(mirrorDb(), 'posts', event.params.postId, safe, eventVersion(event));
   }
 );
 
@@ -67,7 +67,7 @@ export const mirrorAccountAccess = onDocumentWritten(
     const uid = event.params.uid;
     const after = event.data?.after;
     if (!after?.exists) {
-      await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, null, eventMillis(event));
+      await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, null, eventVersion(event));
       return;
     }
     const account = normalizeAccountStatus(after.data());
