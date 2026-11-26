@@ -50,7 +50,7 @@ const access = new Map();
 function accessFor(uid) {
   if (!access.has(uid)) {
     access.set(uid, {
-      accountStatus: 'active',
+      accountStatus: 'inactive',
       suspensionUntil: null,
       ownBlockedIds: new Set(),
       blockedByIds: new Set(),
