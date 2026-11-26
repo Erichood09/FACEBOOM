@@ -1,0 +1,15 @@
+name = "faceboom-flutterwave-payments"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+FLW_MODE = "test"
+FIREBASE_PROJECT_IDS = "faceboom-46273"
+FACEBOOM_APP_URL = "https://faceboom-46273.web.app"
+FACEBOOM_ORIGINS = "https://faceboom-46273.web.app"
+
+[[d1_databases]]
+binding = "PAYMENTS_DB"
+database_name = "faceboom-payments"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+migrations_dir = "migrations"
