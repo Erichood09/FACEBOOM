@@ -19,7 +19,7 @@ function json(body, status = 200, origin = '*') {
   });
 }
 
-function safeEqual(left, right) {
+export function safeEqual(left, right) {
   if (typeof left !== 'string' || typeof right !== 'string' || left.length !== right.length) return false;
   let difference = 0;
   for (let index = 0; index < left.length; index += 1) {
@@ -45,7 +45,8 @@ export function isTestConfiguration(env) {
     && typeof env.FLW_SECRET_KEY === 'string'
     && env.FLW_SECRET_KEY.startsWith('FLWSECK_TEST-')
     && Boolean(env.PAYMENTS_DB)
-    && Boolean(env.FLW_WEBHOOK_SECRET);
+    && Boolean(env.FLW_WEBHOOK_SECRET)
+    && Boolean(env.FACEBOOM_APP_URL);
 }
 
 function projectIds(env) {
@@ -156,8 +157,10 @@ async function verifyAndCredit(transactionId, txRef, uid, env) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
+    const url = new URL(request.url);
+    const isWebhook = url.pathname === '/webhooks/flutterwave';
     const allowedOrigins = (env.FACEBOOM_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean);
-    if (!allowedOrigins.includes(origin)) return json({ error: 'Origin not allowed.' }, 403, origin);
+    if (!allowedOrigins.includes(origin) && !(isWebhook && !origin)) return json({ error: 'Origin not allowed.' }, 403, origin);
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
@@ -170,7 +173,6 @@ export default {
       });
     }
 
-    const url = new URL(request.url);
     if (url.pathname === '/webhooks/flutterwave' && request.method === 'POST') {
       if (!env.FLW_WEBHOOK_SECRET || !safeEqual(request.headers.get('verif-hash') || '', env.FLW_WEBHOOK_SECRET)) {
         return json({ error: 'Invalid webhook signature.' }, 401, origin);
