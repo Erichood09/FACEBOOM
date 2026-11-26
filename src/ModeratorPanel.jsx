@@ -4,6 +4,7 @@ import {
   serverTimestamp, Timestamp, updateDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
+import MetaInboxPanel from './MetaInboxPanel';
 
 function displayDate(value) {
   const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
@@ -223,6 +224,8 @@ export default function ModeratorPanel({ user, onBack }) {
           <small style={{ color: '#666' }}>{displayDate(item.createdAt)}{item.durationHours ? ` · ${item.durationHours} hours` : ''}</small>
         </article>
       ))}
+
+      <MetaInboxPanel user={user} />
     </section>
   );
 }

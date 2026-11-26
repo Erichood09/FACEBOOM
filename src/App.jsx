@@ -15,6 +15,8 @@ import { uploadToCloudinary } from './cloudinary';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  FacebookAuthProvider,
+  signInWithPopup,
   sendPasswordResetEmail,
   onAuthStateChanged,
   getIdTokenResult,
@@ -48,6 +50,7 @@ function App() {
 
   const [error, setError] = useState('');
   const [passwordResetMessage, setPasswordResetMessage] = useState('');
+  const [facebookBusy, setFacebookBusy] = useState(false);
 
   const [profile, setProfile] = useState({
     fullName: '',
@@ -331,65 +334,130 @@ function App() {
     let active = true;
     setSharedProfileLoading(true);
     setSharedProfileError('');
-    getDoc(doc(db, 'publicProfiles', profileUid))
-      .then((snapshot) => {
+    async function loadSharedProfile() {
+      try {
+        const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+        let profileData = null;
+        if (secureDataApi) {
+          const token = await user.getIdToken();
+          const baseUrl = secureDataApi.endsWith('/') ? secureDataApi.slice(0, -1) : secureDataApi;
+          const response = await fetch(`${baseUrl}/v1/profile/${encodeURIComponent(profileUid)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            if (response.status === 404) {
+              setSharedProfile(null);
+              setSharedProfileError('This profile is not available.');
+              return;
+            }
+            throw new Error(result.error || 'Secure profile request failed.');
+          }
+          profileData = result.profile || null;
+        } else {
+          // Temporary compatibility path until the isolated mirror is deployed.
+          const snapshot = await getDoc(doc(db, 'publicProfiles', profileUid));
+          profileData = snapshot.exists() ? { uid: profileUid, ...snapshot.data() } : null;
+        }
         if (!active) return;
-        if (snapshot.exists()) {
-          setSharedProfile({ uid: profileUid, ...snapshot.data() });
+        if (profileData) {
+          setSharedProfile(profileData);
         } else {
           setSharedProfile(null);
           setSharedProfileError('This profile is not available.');
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Load shared profile:', err);
         if (active) setSharedProfileError('Unable to open this profile right now.');
-      })
-      .finally(() => {
+      } finally {
         if (active) setSharedProfileLoading(false);
-      });
+      }
+    }
+    loadSharedProfile();
 
     return () => { active = false; };
   }, [user]);
 
   // LOAD NEWS FEED
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
 
+    let active = true;
     setFeedLoading(true);
     setFeedError('');
 
-    const postsCollection = collection(db, 'posts');
-    // Firestore supports at most 30 values in a not-in filter. For typical
-    // block-list sizes, exclude blocked pairs before post data reaches the UI.
-    const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
-      ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
-      : query(postsCollection, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      postsQuery,
-      (snapshot) => {
-        const loadedPosts = snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data()
-        })).sort((a, b) => {
-          const time = (value) => value?.toMillis
-            ? value.toMillis()
-            : new Date(value || 0).getTime();
-          return time(b.createdAt) - time(a.createdAt);
-        });
-
-        setPosts(loadedPosts);
-        setFeedLoading(false);
-      },
-      (err) => {
-        console.error('Feed error:', err);
-        setFeedError('Unable to load posts. Please check your connection.');
-        setFeedLoading(false);
+    async function loadFeed() {
+      const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+      if (secureDataApi) {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch(`${secureDataApi.replace(/\/$/, '')}/v1/feed`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Secure feed request failed.');
+          if (active) {
+            setPosts(Array.isArray(result.posts) ? result.posts : []);
+            setFeedLoading(false);
+          }
+        } catch (err) {
+          console.error('Secure feed error:', err);
+          if (active) {
+            setFeedError('Unable to load posts securely. Please try again later.');
+            setFeedLoading(false);
+          }
+        }
+        return;
       }
-    );
 
-    return () => unsubscribe();
+      // Temporary compatibility path until the read-only Worker is deployed.
+      // Firestore list permissions must not be tightened before the Worker URL
+      // is configured in the web build, or the feed will stop loading.
+      const postsCollection = collection(db, 'posts');
+      const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+        ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
+        : query(postsCollection, orderBy('createdAt', 'desc'));
+
+      const unsubscribe = onSnapshot(
+        postsQuery,
+        (snapshot) => {
+          const hiddenMemberIds = new Set(blockedUserIds);
+          const loadedPosts = snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data()
+          }))
+            .filter((item) => !hiddenMemberIds.has(item.authorId))
+            .sort((a, b) => {
+              const time = (value) => value?.toMillis
+                ? value.toMillis()
+                : new Date(value || 0).getTime();
+              return time(b.createdAt) - time(a.createdAt);
+            });
+
+          setPosts(loadedPosts);
+          setFeedLoading(false);
+        },
+        (err) => {
+          console.error('Feed error:', err);
+          setFeedError('Unable to load posts. Please check your connection.');
+          setFeedLoading(false);
+        }
+      );
+      return unsubscribe;
+    }
+
+    let unsubscribe;
+    loadFeed().then((stop) => {
+      unsubscribe = stop;
+      if (!active && unsubscribe) unsubscribe();
+    });
+
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, blockedUserIds]);
 
   // LOAD LIKES
@@ -613,6 +681,38 @@ function App() {
       } else {
         setError(err.message);
       }
+    }
+  }
+
+  // SIGN IN OR REGISTER USING FACEBOOK THROUGH FIREBASE AUTH.
+  // The Facebook provider must first be enabled in Firebase Console.
+  async function handleFacebookAuth() {
+    if (facebookBusy) return;
+    setFacebookBusy(true);
+    setError('');
+    setPasswordResetMessage('');
+    try {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      // The existing auth-state profile loader creates a FACEBOOM profile for new members.
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error('Facebook sign-in failed:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Facebook sign-in is not enabled in Firebase yet. The administrator must enable the Facebook provider and add its Meta App credentials.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This website domain is not yet authorised for Facebook sign-in in Firebase.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Your browser blocked the Facebook sign-in window. Allow pop-ups for FACEBOOM and try again.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Facebook sign-in was cancelled before it finished.');
+      } else if (err.code === 'auth/account-exists-with-different-credential') {
+        setError('An account already uses this email with another sign-in method. Log in with that method first.');
+      } else {
+        setError('Facebook sign-in could not be completed. Check the Facebook app and Firebase provider setup, then try again.');
+      }
+    } finally {
+      setFacebookBusy(false);
     }
   }
 
@@ -1048,6 +1148,23 @@ function App() {
             </button>
           </form>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0', color: '#65676b', fontSize: 13 }}>
+            <span style={{ flex: 1, height: 1, background: '#ddd' }} />
+            OR
+            <span style={{ flex: 1, height: 1, background: '#ddd' }} />
+          </div>
+          <button
+            type="button"
+            onClick={handleFacebookAuth}
+            disabled={facebookBusy}
+            style={{ ...primaryButtonStyle, background: '#1877f2', opacity: facebookBusy ? 0.7 : 1 }}
+          >
+            {facebookBusy ? 'Connecting to Facebook...' : 'Continue with Facebook'}
+          </button>
+          <p style={{ color: '#65676b', fontSize: 12, marginTop: 8 }}>
+            Facebook sign-in connects your FACEBOOM account. It does not give FACEBOOM access to your personal Messenger inbox.
+          </p>
+
           <p style={{ marginTop: 20 }}>
             {registering
               ? 'Already have an account?'
@@ -1114,12 +1231,12 @@ function App() {
   return (
     <div style={homePageStyle}>
 
-      <header style={headerStyle}>
+      <header className="fb-header" style={headerStyle}>
         <h1 style={{ color: '#1877f2', margin: 0 }}>
           FACEBOOM
         </h1>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="fb-header-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             style={headerButtonStyle}
             onClick={() => {
@@ -1671,7 +1788,8 @@ function App() {
                         <video
                           src={item.mediaUrl}
                           controls
-                          preload="metadata"
+                          preload="none"
+                          playsInline
                           style={postMediaStyle}
                         >
                           Your browser does not support video playback.
@@ -1681,6 +1799,7 @@ function App() {
                           src={item.mediaUrl}
                           alt="Post attachment"
                           loading="lazy"
+                          decoding="async"
                           style={postMediaStyle}
                         />
                       )}
@@ -1808,6 +1927,30 @@ function App() {
           </>
         )}
       </main>
+
+      <nav className="fb-mobile-nav" aria-label="Main navigation">
+        <button type="button" className={!showProfile && !showFriends && !showMessages && !showNotifications && !showWallet && !showLive && !showModerator ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowMessages(false); setShowModerator(false); setShowLive(false); setEditingProfile(false);
+        }}><span aria-hidden="true">⌂</span><small>Home</small></button>
+        <button type="button" className={showFriends ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowMessages(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowFriends(true);
+        }}><span aria-hidden="true">♧</span><small>Friends</small></button>
+        <button type="button" className={showMessages ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowMessages(true);
+        }}><span aria-hidden="true">✉</span><small>Messages</small></button>
+        <button type="button" className={showNotifications ? 'active' : ''} onClick={() => {
+          setShowProfile(false); setShowWallet(false); setShowFriends(false); setShowMessages(false);
+          setShowModerator(false); setShowLive(false); setEditingProfile(false); setShowNotifications(true);
+        }}><span aria-hidden="true">♢</span><small>Alerts</small></button>
+        <button type="button" className={showProfile ? 'active' : ''} onClick={() => {
+          setShowProfile(true); setShowNotifications(false); setShowWallet(false); setShowFriends(false);
+          setShowMessages(false); setShowModerator(false); setShowLive(false); setEditingProfile(false);
+          setProfileMessage(''); setProfileError('');
+        }}><span aria-hidden="true">●</span><small>Profile</small></button>
+      </nav>
     </div>
   );
 }

@@ -91,15 +91,30 @@ export default function FriendsPanel({ user, profile, onBack }) {
     setLoadingPeople(true);
     setError('');
     try {
-      const directory = collection(db, 'publicProfiles');
-      const hiddenIds = [...new Set([...blockedUserIds, ...blockedByUserIds])];
-      const directoryQuery = hiddenIds.length > 0 && hiddenIds.length <= 30
-        ? query(directory, where(documentId(), 'not-in', hiddenIds))
-        : directory;
-      const snapshot = await getDocs(directoryQuery);
-      setPeople(snapshot.docs
-        .filter((item) => item.id !== user.uid)
-        .map((item) => publicProfile(item.data(), item.id)));
+      const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+      if (secureDataApi) {
+        const token = await user.getIdToken();
+        const response = await fetch(`${secureDataApi.replace(/\/$/, '')}/v1/directory`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store'
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Secure directory request failed.');
+        setPeople((Array.isArray(result.profiles) ? result.profiles : [])
+          .map((item) => publicProfile(item, item.uid)));
+      } else {
+        // Temporary compatibility path until the read-only Worker is deployed.
+        // Do not tighten Firestore list permissions before its URL is configured.
+        const directory = collection(db, 'publicProfiles');
+        const hiddenIds = [...new Set([...blockedUserIds, ...blockedByUserIds])];
+        const directoryQuery = hiddenIds.length > 0 && hiddenIds.length <= 30
+          ? query(directory, where(documentId(), 'not-in', hiddenIds))
+          : directory;
+        const snapshot = await getDocs(directoryQuery);
+        setPeople(snapshot.docs
+          .filter((item) => item.id !== user.uid)
+          .map((item) => publicProfile(item.data(), item.id)));
+      }
     } catch (err) {
       console.error('Find friends error:', err);
       setError('Unable to search for people. Your Firestore access rules may need updating.');

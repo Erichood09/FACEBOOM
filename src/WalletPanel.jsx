@@ -118,13 +118,13 @@ export default function WalletPanel({ user, onBack }) {
   }
 
   return (
-    <section style={{ maxWidth: 760, margin: '0 auto' }}>
+    <section className="fb-wallet-panel" style={{ maxWidth: 760, margin: '0 auto' }}>
       <button type="button" onClick={onBack} style={{ ...primaryButton, background: '#667085', marginBottom: 14 }}>
         Back
       </button>
       <div style={cardStyle}>
         <h2 style={{ marginTop: 0, color: '#1877f2' }}>FACEBOOM Wallet</h2>
-        <p style={{ ...mutedText, marginTop: -5 }}>Buy gift credits to use when supporting members during Live broadcasts.</p>
+        <p style={{ ...mutedText, marginTop: -5 }}>Wallet preview for future gift credits. Paid gifts and creator payouts are not enabled yet.</p>
         <div style={{ background: '#f3f7ff', borderRadius: 12, padding: 16 }}>
           <div style={mutedText}>Your coin balance</div>
           <div style={{ fontSize: 30, fontWeight: 800, color: '#172b4d' }}>{balance.toLocaleString()} coins</div>

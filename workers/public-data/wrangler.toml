@@ -1,0 +1,9 @@
+name = "faceboom-public-data"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_AUTH_PROJECT_ID = "faceboom-46273"
+FIREBASE_PUBLIC_DATA_PROJECT_ID = "faceboom-public-data"
+FACEBOOM_ORIGINS = "https://faceboom-46273.web.app"

@@ -64,15 +64,40 @@ export default function MessagesPanel({ user, profile, onBack }) {
     let active = true;
     async function loadPeople() {
       try {
-        const directory = collection(db, 'publicProfiles');
-        const directoryQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
-          ? query(directory, where(documentId(), 'not-in', blockedUserIds))
-          : directory;
-        const snap = await getDocs(directoryQuery);
-        if (!active) return;
-        setPeople(snap.docs
-          .filter((item) => item.id !== user.uid)
-          .map((item) => ({ uid: item.id, ...item.data() })));
+        const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+        if (secureDataApi) {
+          const token = await user.getIdToken();
+          const response = await fetch(`${(secureDataApi.endsWith('/') ? secureDataApi.slice(0, -1) : secureDataApi)}/v1/directory`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Secure member directory request failed.');
+          if (!active) return;
+          setPeople((Array.isArray(result.profiles) ? result.profiles : [])
+            .filter((person) => person.uid !== user.uid)
+            .map((person) => ({
+              uid: person.uid,
+              fullName: person.fullName || 'FACEBOOM User',
+              username: person.username || '',
+              country: person.country || '',
+              bio: person.bio || '',
+              photoURL: person.photoURL || '',
+              coverPhotoURL: person.coverPhotoURL || ''
+            })));
+        } else {
+          // Temporary compatibility path until the read-only Worker is deployed.
+          // Keep Firestore list access until all directory readers use the Worker.
+          const directory = collection(db, 'publicProfiles');
+          const directoryQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+            ? query(directory, where(documentId(), 'not-in', blockedUserIds))
+            : directory;
+          const snap = await getDocs(directoryQuery);
+          if (!active) return;
+          setPeople(snap.docs
+            .filter((item) => item.id !== user.uid)
+            .map((item) => ({ uid: item.id, ...item.data() })));
+        }
       } catch (err) {
         console.error('Load message directory:', err);
         if (active) setError('Unable to load members. Check your Firestore rules.');
@@ -268,7 +293,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
         <button type="button" style={buttonStyle} onClick={onBack}>Back to Home</button>
       </div>
       {error && <p style={{ color: '#b42318' }}>{error}</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(230px, 0.85fr) minmax(280px, 1.5fr)', gap: 14 }}>
+      <div className="fb-messages-layout">
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Your Inbox</h3>
           {visibleConversations.length === 0 && <p style={{ color: '#666' }}>No conversations yet. Search for a member below to send the first message.</p>}
@@ -317,7 +342,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
                   </div>;
                 })}
               </div>
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <form className="fb-messages-composer" onSubmit={sendMessage}>
                 <input value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} placeholder="Write a private message..." style={{ flex: 1, minWidth: 0, padding: 11, border: '1px solid #ccc', borderRadius: 8 }} />
                 <button type="submit" disabled={sending || !draft.trim()} style={{ ...buttonStyle, background: '#1877f2', color: '#fff', borderColor: '#1877f2', opacity: sending || !draft.trim() ? 0.6 : 1 }}>{sending ? 'Sending...' : 'Send'}</button>
               </form>
@@ -325,7 +350,6 @@ export default function MessagesPanel({ user, profile, onBack }) {
           )}
         </div>
       </div>
-      <style>{`@media (max-width: 680px) { section > div:nth-of-type(2) { grid-template-columns: 1fr !important; } }`}</style>
     </section>
   );
 }

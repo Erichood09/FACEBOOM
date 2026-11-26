@@ -52,7 +52,7 @@ export default function NotificationsPanel({ user, onBack }) {
 
   const unreadCount = notifications.filter((item) => !item.readAt).length;
   return (
-    <section style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 18 }}>
+    <section className="fb-notifications-panel" style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ color: '#1877f2', margin: '4px 0' }}>Notifications</h2>
@@ -66,11 +66,11 @@ export default function NotificationsPanel({ user, onBack }) {
       ) : (
         <div style={{ display: 'grid', gap: 9 }}>
           {notifications.map((item) => (
-            <article key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: item.readAt ? '#fff' : '#eef5ff' }}>
+            <article className="fb-notification-item" key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: item.readAt ? '#fff' : '#eef5ff' }}>
               <strong>{item.actorName || 'A FACEBOOM member'}</strong>
               <p style={{ margin: '6px 0' }}>{item.type === 'friend_request' ? 'sent you a friend request.' : 'sent you a notification.'}</p>
               {!item.readAt && (
-                <button type="button" onClick={() => markRead(item)} disabled={busyId === item.id} style={{ border: 0, background: 'transparent', color: '#1877f2', padding: 0, cursor: 'pointer' }}>
+                <button type="button" className="fb-notification-read" onClick={() => markRead(item)} disabled={busyId === item.id}>
                   {busyId === item.id ? 'Updating...' : 'Mark as read'}
                 </button>
               )}
