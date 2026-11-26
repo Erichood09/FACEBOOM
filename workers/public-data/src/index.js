@@ -42,6 +42,15 @@ export function decodeFirestoreFields(fields = {}) {
   );
 }
 
+
+export function isAccountActive(account, now = Date.now()) {
+  if (account?.accountStatus === 'active') return true;
+  return account?.accountStatus === 'suspended'
+    && typeof account.suspensionUntil === 'string'
+    && Number.isFinite(Date.parse(account.suspensionUntil))
+    && Date.parse(account.suspensionUntil) <= now;
+}
+
 export function filterBlockedItems(items, ownBlockedIds = [], blockedByIds = [], viewerUid, key = 'authorId') {
   const hidden = new Set([...ownBlockedIds, ...blockedByIds]);
   return items.filter((item) =>
@@ -163,11 +172,7 @@ async function loadViewerContext(uid, projectId, accessToken) {
   );
   if (!document) return { error: 'FACEBOOM account access record was not found.', status: 403 };
   const viewer = decodeFirestoreFields(document.fields || {});
-  const active = viewer.accountStatus === 'active'
-    || (viewer.accountStatus === 'suspended'
-      && viewer.suspensionUntil
-      && Date.parse(viewer.suspensionUntil) <= Date.now());
-  if (!active) {
+  if (!isAccountActive(viewer)) {
     return { error: 'This account cannot access the public feed or directory.', status: 403 };
   }
   return {
@@ -276,12 +281,19 @@ export default {
       if (auth.error) return json({ error: auth.error }, auth.status, origin);
 
       if (url.pathname === '/v1/directory') {
-        const documents = await listCollection('publicProfiles', auth.accessToken, auth.projectId, PAGE_SIZE);
+        const [documents, accessDocuments] = await Promise.all([
+          listCollection('publicProfiles', auth.accessToken, auth.projectId, PAGE_SIZE),
+          listCollection('viewerAccess', auth.accessToken, auth.projectId, 1000)
+        ]);
+        const accountByUid = new Map(accessDocuments.map((item) => [
+          item.name.split('/').pop(), decodeFirestoreFields(item.fields || {})
+        ]));
+        const activeProfiles = documents.map((item) => ({
+          ...decodeFirestoreFields(item.fields || {}),
+          uid: item.name.split('/').pop()
+        })).filter((profile) => isAccountActive(accountByUid.get(profile.uid)));
         const profiles = filterBlockedItems(
-          documents.map((item) => ({
-            ...decodeFirestoreFields(item.fields || {}),
-            uid: item.name.split('/').pop()
-          })),
+          activeProfiles,
           auth.ownBlockedIds,
           auth.blockedByIds,
           auth.uid,
@@ -295,12 +307,14 @@ export default {
         if (uid === auth.uid || auth.ownBlockedIds.includes(uid) || auth.blockedByIds.includes(uid)) {
           return json({ error: 'This profile is not available.' }, 404, origin);
         }
-        const document = await firestoreRequest(
-          `publicProfiles/${encodeURIComponent(uid)}`,
-          auth.accessToken,
-          auth.projectId
-        );
-        if (!document) return json({ error: 'This profile is not available.' }, 404, origin);
+        const [document, accessDocument] = await Promise.all([
+          firestoreRequest(`publicProfiles/${encodeURIComponent(uid)}`, auth.accessToken, auth.projectId),
+          firestoreRequest(`viewerAccess/${encodeURIComponent(uid)}`, auth.accessToken, auth.projectId)
+        ]);
+        if (!document || !accessDocument
+          || !isAccountActive(decodeFirestoreFields(accessDocument.fields || {}))) {
+          return json({ error: 'This profile is not available.' }, 404, origin);
+        }
         return json({
           profile: { ...decodeFirestoreFields(document.fields || {}), uid }
         }, 200, origin);
