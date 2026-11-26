@@ -44,7 +44,11 @@ export function decodeFirestoreFields(fields = {}) {
 
 export function filterBlockedItems(items, ownBlockedIds, blockedByIds, viewerUid, key = 'authorId') {
   const hidden = new Set([...ownBlockedIds, ...blockedByIds]);
-  return items.filter((item) => item[key] && !hidden.has(item[key]));
+  return items.filter((item) =>
+    item[key]
+    && !hidden.has(item[key])
+    && (key !== 'uid' || item[key] !== viewerUid)
+  );
 }
 
 function encodeCursor(value) {
