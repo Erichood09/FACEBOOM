@@ -1,0 +1,16 @@
+name = "faceboom-meta-bridge"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+FIREBASE_AUTH_PROJECT_ID = "faceboom-46273"
+FACEBOOM_ORIGINS = "https://faceboom-46273.web.app"
+META_GRAPH_API_VERSION = "v27.0"
+
+# Create a D1 database named faceboom-meta-bridge, then replace this
+# placeholder with the database ID before deploying the Worker.
+[[d1_databases]]
+binding = "META_DB"
+database_name = "faceboom-meta-bridge"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
