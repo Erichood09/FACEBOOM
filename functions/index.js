@@ -39,7 +39,7 @@ function eventVersion(event) {
 }
 
 export const mirrorPublicProfile = onDocumentWritten(
-  { document: 'publicProfiles/{uid}', region: 'us-central1', retry: true },
+  { document: 'publicProfiles/{uid}', region: 'eur3', retry: true },
   async (event) => {
     const uid = event.params.uid;
     const after = event.data?.after;
@@ -53,7 +53,7 @@ export const mirrorPublicProfile = onDocumentWritten(
 );
 
 export const mirrorPublicPost = onDocumentWritten(
-  { document: 'posts/{postId}', region: 'us-central1', retry: true },
+  { document: 'posts/{postId}', region: 'eur3', retry: true },
   async (event) => {
     const after = event.data?.after;
     const safe = after?.exists ? publicPost(after.data()) : null;
@@ -62,7 +62,7 @@ export const mirrorPublicPost = onDocumentWritten(
 );
 
 export const mirrorAccountAccess = onDocumentWritten(
-  { document: 'users/{uid}', region: 'us-central1', retry: true },
+  { document: 'users/{uid}', region: 'eur3', retry: true },
   async (event) => {
     const uid = event.params.uid;
     const after = event.data?.after;
@@ -79,7 +79,7 @@ export const mirrorAccountAccess = onDocumentWritten(
 );
 
 export const mirrorBlockRelationship = onDocumentWritten(
-  { document: 'users/{blockerUid}/blocked/{blockedUid}', region: 'us-central1', retry: true },
+  { document: 'users/{blockerUid}/blocked/{blockedUid}', region: 'eur3', retry: true },
   async (event) => {
     const { blockerUid, blockedUid } = event.params;
     if (blockerUid === blockedUid) return;
