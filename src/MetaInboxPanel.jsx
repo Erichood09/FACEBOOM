@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const API_BASE = (import.meta.env.VITE_META_BRIDGE_URL || '').replace(/\\/$/, '');
+const API_BASE = (import.meta.env.VITE_META_BRIDGE_URL || '').replace(/\/$/, '');
 
 export default function MetaInboxPanel({ user }) {
   const [tab, setTab] = useState('messages');
