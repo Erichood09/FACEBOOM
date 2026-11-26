@@ -72,11 +72,11 @@ export default function WalletPanel({ user, onBack }) {
       const attemptKey = transactionId && txRef ? `${transactionId}:${txRef}` : '';
       try {
         if (attemptKey && returnAttempt.current !== attemptKey) {
-          returnAttempt.current = attemptKey;
           const result = await apiRequest('/v1/verify-return', {
             method: 'POST',
             body: JSON.stringify({ transactionId, txRef })
           });
+          returnAttempt.current = attemptKey;
           if (active) setMessage(`Payment verified. ${result.coinsAdded} coins were added to your wallet.`);
           params.delete('wallet');
           params.delete('status');
