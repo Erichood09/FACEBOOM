@@ -29,17 +29,23 @@ function eventMillis(event) {
   return Number.isFinite(value) ? value : Date.now();
 }
 
+function eventVersion(event) {
+  return typeof event.time === 'string' && event.time
+    ? event.time
+    : new Date(eventMillis(event)).toISOString();
+}
+
 export const mirrorPublicProfile = onDocumentWritten(
   { document: 'publicProfiles/{uid}', region: 'us-central1', retry: true },
   async (event) => {
     const uid = event.params.uid;
     const after = event.data?.after;
     if (!after?.exists) {
-      await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, null, eventMillis(event));
+      await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, null, eventVersion(event));
       return;
     }
     const safe = publicProfile(after.data(), uid);
-    await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, safe, eventMillis(event));
+    await writeVersionedMirrorDocument(mirrorDb(), 'publicProfiles', uid, safe, eventVersion(event));
   }
 );
 
@@ -65,7 +71,7 @@ export const mirrorAccountAccess = onDocumentWritten(
     await writeVersionedMirrorDocument(mirrorDb(), 'viewerAccess', uid, {
       ...account,
       updatedAt: new Date(eventMillis(event))
-    }, eventMillis(event), true);
+    }, eventVersion(event), true);
   }
 );
 
@@ -80,6 +86,7 @@ export const mirrorBlockRelationship = onDocumentWritten(
     const blockedRef = db.doc(`viewerAccess/${blockedUid}`);
     const exists = Boolean(event.data?.after?.exists);
     const incomingTime = eventMillis(event);
+    const incomingVersion = eventVersion(event);
 
     await db.runTransaction(async (transaction) => {
       const [edgeSnap, blockerSnap, blockedSnap] = await Promise.all([
@@ -87,8 +94,8 @@ export const mirrorBlockRelationship = onDocumentWritten(
         transaction.get(blockerRef),
         transaction.get(blockedRef)
       ]);
-      const priorTime = edgeSnap.exists ? Number(edgeSnap.get('eventMillis') || 0) : 0;
-      if (priorTime >= incomingTime) return;
+      const priorVersion = edgeSnap.exists ? edgeSnap.get('eventVersion') : null;
+      if (priorVersion && incomingVersion <= priorVersion) return;
       const blockerState = applyBlockEdge(blockerSnap.data(), blockerUid, blockedUid, exists);
       const blockedState = applyBlockEdge(blockedSnap.data(), blockerUid, blockedUid, exists);
 
@@ -103,7 +110,7 @@ export const mirrorBlockRelationship = onDocumentWritten(
         updatedAt: new Date(incomingTime)
       }, { merge: true });
 
-      transaction.set(edgeRef, { blockerUid, blockedUid, exists, eventMillis: incomingTime });
+      transaction.set(edgeRef, { blockerUid, blockedUid, exists, eventMillis: incomingTime, eventVersion: incomingVersion });
     });
   }
 );
