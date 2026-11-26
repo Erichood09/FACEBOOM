@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { defineString } from 'firebase-functions/params';
 import {
@@ -80,8 +80,6 @@ export const mirrorAccountAccess = onDocumentWritten(
     const ref = mirrorDb().doc(`viewerAccess/${uid}`);
     await ref.set({
       ...account,
-      ownBlockedIds: FieldValue.arrayUnion(),
-      blockedByIds: FieldValue.arrayUnion(),
       updatedAt: new Date(eventMillis(event))
     }, { merge: true });
   }
@@ -106,7 +104,7 @@ export const mirrorBlockRelationship = onDocumentWritten(
         transaction.get(blockedRef)
       ]);
       const priorTime = edgeSnap.exists ? Number(edgeSnap.get('eventMillis') || 0) : 0;
-      if (priorTime > incomingTime) return;
+      if (priorTime >= incomingTime) return;
       const blockerState = applyBlockEdge(blockerSnap.data(), blockerUid, blockedUid, exists);
       const blockedState = applyBlockEdge(blockedSnap.data(), blockerUid, blockedUid, exists);
 
@@ -121,11 +119,7 @@ export const mirrorBlockRelationship = onDocumentWritten(
         updatedAt: new Date(incomingTime)
       }, { merge: true });
 
-      if (exists) {
-        transaction.set(edgeRef, { blockerUid, blockedUid, eventMillis: incomingTime });
-      } else if (edgeSnap.exists) {
-        transaction.delete(edgeRef);
-      }
+      transaction.set(edgeRef, { blockerUid, blockedUid, exists, eventMillis: incomingTime });
     });
   }
 );
