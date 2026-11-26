@@ -60,19 +60,28 @@ function accessFor(uid) {
   return access.get(uid);
 }
 
-const profiles = [];
-await forEachDocument(sourceDb.collection('publicProfiles'), async (document) => {
-  const safe = publicProfile(document.data(), document.id);
-  if (safe) profiles.push([mirrorDb.doc(`publicProfiles/${document.id}`), safe]);
-});
-const profileCount = await writeInBatches(profiles);
+async function copyCollection(sourceName, targetName, transform) {
+  let copied = 0;
+  let batch = mirrorDb.batch();
+  let pending = 0;
+  await forEachDocument(sourceDb.collection(sourceName), async (document) => {
+    const safe = transform(document.data(), document.id);
+    if (!safe) return;
+    batch.set(mirrorDb.doc(`${targetName}/${document.id}`), safe, { merge: true });
+    copied += 1;
+    pending += 1;
+    if (pending === 450) {
+      await batch.commit();
+      batch = mirrorDb.batch();
+      pending = 0;
+    }
+  });
+  if (pending) await batch.commit();
+  return copied;
+}
 
-const posts = [];
-await forEachDocument(sourceDb.collection('posts'), async (document) => {
-  const safe = publicPost(document.data());
-  if (safe) posts.push([mirrorDb.doc(`posts/${document.id}`), safe]);
-});
-const postCount = await writeInBatches(posts);
+const profileCount = await copyCollection('publicProfiles', 'publicProfiles', publicProfile);
+const postCount = await copyCollection('posts', 'posts', (data) => publicPost(data));
 
 let userCount = 0;
 let blockCount = 0;
@@ -83,14 +92,16 @@ await forEachDocument(sourceDb.collection('users'), async (document) => {
   Object.assign(accessFor(uid), status, { updatedAt: new Date() });
   userCount += 1;
 
-  const blocked = await sourceDb.collection('users').doc(uid).collection('blocked').get();
-  for (const blockedDocument of blocked.docs) {
-    const blockedUid = blockedDocument.id;
-    if (blockedUid === uid) continue;
-    accessFor(uid).ownBlockedIds.add(blockedUid);
-    accessFor(blockedUid).blockedByIds.add(uid);
-    blockCount += 1;
-  }
+  await forEachDocument(
+    sourceDb.collection('users').doc(uid).collection('blocked'),
+    async (blockedDocument) => {
+      const blockedUid = blockedDocument.id;
+      if (blockedUid === uid) return;
+      accessFor(uid).ownBlockedIds.add(blockedUid);
+      accessFor(blockedUid).blockedByIds.add(uid);
+      blockCount += 1;
+    }
+  );
 });
 
 for (const [uid, state] of access.entries()) {
