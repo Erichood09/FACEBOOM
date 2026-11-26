@@ -354,48 +354,83 @@ function App() {
 
   // LOAD NEWS FEED
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
 
+    let active = true;
     setFeedLoading(true);
     setFeedError('');
 
-    const postsCollection = collection(db, 'posts');
-    // Firestore supports at most 30 values in a not-in filter. For typical
-    // block-list sizes, exclude blocked pairs before post data reaches the UI.
-    const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
-      ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
-      : query(postsCollection, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      postsQuery,
-      (snapshot) => {
-        const hiddenMemberIds = new Set(blockedUserIds);
-        const loadedPosts = snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data()
-        }))
-          // The Firestore not-in query is limited to 30 IDs. When the block
-          // list is larger, the fallback query is broad, so always filter the
-          // snapshot before placing posts in the visible feed.
-          .filter((item) => !hiddenMemberIds.has(item.authorId))
-          .sort((a, b) => {
-            const time = (value) => value?.toMillis
-              ? value.toMillis()
-              : new Date(value || 0).getTime();
-            return time(b.createdAt) - time(a.createdAt);
+    async function loadFeed() {
+      const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+      if (secureDataApi) {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch(`${secureDataApi.replace(/\\/$/, '')}/v1/feed`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
           });
-
-        setPosts(loadedPosts);
-        setFeedLoading(false);
-      },
-      (err) => {
-        console.error('Feed error:', err);
-        setFeedError('Unable to load posts. Please check your connection.');
-        setFeedLoading(false);
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Secure feed request failed.');
+          if (active) {
+            setPosts(Array.isArray(result.posts) ? result.posts : []);
+            setFeedLoading(false);
+          }
+        } catch (err) {
+          console.error('Secure feed error:', err);
+          if (active) {
+            setFeedError('Unable to load posts securely. Please try again later.');
+            setFeedLoading(false);
+          }
+        }
+        return;
       }
-    );
 
-    return () => unsubscribe();
+      // Temporary compatibility path until the read-only Worker is deployed.
+      // Firestore list permissions must not be tightened before the Worker URL
+      // is configured in the web build, or the feed will stop loading.
+      const postsCollection = collection(db, 'posts');
+      const postsQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+        ? query(postsCollection, where('authorId', 'not-in', blockedUserIds))
+        : query(postsCollection, orderBy('createdAt', 'desc'));
+
+      const unsubscribe = onSnapshot(
+        postsQuery,
+        (snapshot) => {
+          const hiddenMemberIds = new Set(blockedUserIds);
+          const loadedPosts = snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data()
+          }))
+            .filter((item) => !hiddenMemberIds.has(item.authorId))
+            .sort((a, b) => {
+              const time = (value) => value?.toMillis
+                ? value.toMillis()
+                : new Date(value || 0).getTime();
+              return time(b.createdAt) - time(a.createdAt);
+            });
+
+          setPosts(loadedPosts);
+          setFeedLoading(false);
+        },
+        (err) => {
+          console.error('Feed error:', err);
+          setFeedError('Unable to load posts. Please check your connection.');
+          setFeedLoading(false);
+        }
+      );
+      return unsubscribe;
+    }
+
+    let unsubscribe;
+    loadFeed().then((stop) => {
+      unsubscribe = stop;
+      if (!active && unsubscribe) unsubscribe();
+    });
+
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, blockedUserIds]);
 
   // LOAD LIKES
