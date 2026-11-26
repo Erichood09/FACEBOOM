@@ -276,7 +276,6 @@ export default {
       if (auth.error) return json({ error: auth.error }, auth.status, origin);
 
       if (url.pathname === '/v1/directory') {
-        const result = await firestoreRequest('publicProfiles', auth.accessToken, auth.projectId);
         const documents = await listCollection('publicProfiles', auth.accessToken, auth.projectId, PAGE_SIZE);
         const profiles = filterBlockedItems(
           documents.map((item) => ({
