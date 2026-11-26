@@ -12,9 +12,20 @@ The functions in this folder run in the existing FACEBOOM source Firebase projec
 
 The Functions handlers use their attached runtime identity / Application Default Credentials to access the mirror. They do not use a downloaded service-account key. Their source data is taken from Firestore event payloads; they do not query the source database.
 
+## Safe initial cutover order
+
+Do not deploy the triggers and run the backfill concurrently. For the initial migration, schedule a short maintenance window and temporarily pause writes to profiles, posts, account status, and block relationships. Keep writes paused until the backfill is complete and the triggers are deployed. This avoids a backfill snapshot overwriting a newer event or a write falling into the gap between the initial copy and trigger activation.
+
+1. Configure the empty mirror project, IAM, and mirror Firestore rules.
+2. Run the one-time backfill while source writes are paused.
+3. Deploy the synchronizer triggers below.
+4. Confirm deployment succeeded, then resume source writes.
+
+The profile, post, and account triggers also maintain per-document version records in the mirror so delayed/retried events cannot overwrite a newer version or resurrect a deleted document.
+
 ## Deploying the synchronizer
 
-After the mirror project and IAM are configured, deploy only these Functions from the repository root:
+After the mirror project and IAM are configured and the backfill is complete, deploy only these Functions from the repository root:
 
 ```powershell
 firebase deploy --only functions --project faceboom-46273
@@ -24,7 +35,7 @@ The Firebase CLI will request the `PUBLIC_DATA_PROJECT_ID` parameter on first de
 
 ## Initial backfill
 
-Event handlers only copy changes that occur after they are deployed. Run the one-time backfill to copy existing profiles, posts, account status, and block relationships.
+The one-time backfill copies existing profiles, posts, account status, and block relationships before event handlers are deployed.
 
 Use a trusted operator account with read access to the source project and write access to the mirror. Authenticate with Google Application Default Credentials (no downloaded key):
 
@@ -36,7 +47,7 @@ npm.cmd --prefix functions install
 npm.cmd --prefix functions run backfill
 ```
 
-Run this only against a newly created, empty mirror project before the Worker is connected. It reports counts only and does not print member data. Re-run after reviewing the plan if the mirror already contains data; this script does not remove stale mirror documents.
+Run this only against a newly created, empty mirror project before the Worker is connected and while source writes are paused. It reports counts only and does not print member data. Re-run after reviewing the plan if the mirror already contains data; this script does not remove stale mirror documents.
 
 ## Mirror client rules
 
