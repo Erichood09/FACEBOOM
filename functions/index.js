@@ -1,4 +1,4 @@
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { defineString } from 'firebase-functions/params';
@@ -10,7 +10,6 @@ import {
 } from './src/mirror.js';
 
 const publicDataProjectId = defineString('PUBLIC_DATA_PROJECT_ID');
-const sourceApp = getApps().find((app) => app.name === '[DEFAULT]') || initializeApp();
 let mirrorApp;
 
 function mirrorDb() {
