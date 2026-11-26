@@ -1,0 +1,15 @@
+{
+  "name": "faceboom-flutterwave-payments-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "deploy": "wrangler deploy --config wrangler.toml"
+  },
+  "dependencies": {
+    "jose": "^6.0.11"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
