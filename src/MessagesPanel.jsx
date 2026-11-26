@@ -64,15 +64,40 @@ export default function MessagesPanel({ user, profile, onBack }) {
     let active = true;
     async function loadPeople() {
       try {
-        const directory = collection(db, 'publicProfiles');
-        const directoryQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
-          ? query(directory, where(documentId(), 'not-in', blockedUserIds))
-          : directory;
-        const snap = await getDocs(directoryQuery);
-        if (!active) return;
-        setPeople(snap.docs
-          .filter((item) => item.id !== user.uid)
-          .map((item) => ({ uid: item.id, ...item.data() })));
+        const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
+        if (secureDataApi) {
+          const token = await user.getIdToken();
+          const response = await fetch(`${secureDataApi.replace(/\\/$/, '')}/v1/directory`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Secure member directory request failed.');
+          if (!active) return;
+          setPeople((Array.isArray(result.profiles) ? result.profiles : [])
+            .filter((person) => person.uid !== user.uid)
+            .map((person) => ({
+              uid: person.uid,
+              fullName: person.fullName || 'FACEBOOM User',
+              username: person.username || '',
+              country: person.country || '',
+              bio: person.bio || '',
+              photoURL: person.photoURL || '',
+              coverPhotoURL: person.coverPhotoURL || ''
+            })));
+        } else {
+          // Temporary compatibility path until the read-only Worker is deployed.
+          // Keep Firestore list access until all directory readers use the Worker.
+          const directory = collection(db, 'publicProfiles');
+          const directoryQuery = blockedUserIds.length > 0 && blockedUserIds.length <= 30
+            ? query(directory, where(documentId(), 'not-in', blockedUserIds))
+            : directory;
+          const snap = await getDocs(directoryQuery);
+          if (!active) return;
+          setPeople(snap.docs
+            .filter((item) => item.id !== user.uid)
+            .map((item) => ({ uid: item.id, ...item.data() })));
+        }
       } catch (err) {
         console.error('Load message directory:', err);
         if (active) setError('Unable to load members. Check your Firestore rules.');
