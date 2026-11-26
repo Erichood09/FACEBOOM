@@ -171,6 +171,39 @@ service cloud.firestore {
         allow update: if false;
       }
 
+      // In-app friend-request notifications are tied atomically to a real
+      // pending friend request. A sender cannot fabricate notifications.
+      match /notifications/{notificationId} {
+        allow get, list: if ownsUser(userId) && activeMember();
+
+        allow create: if activeMember()
+          && request.auth.uid == request.resource.data.actorUid
+          && request.resource.data.recipientUid == userId
+          && request.resource.data.type == 'friend_request'
+          && request.resource.data.requestId == request.resource.data.actorUid + '_' + userId
+          && request.resource.data.actorName is string
+          && request.resource.data.actorName.size() <= 120
+          && request.resource.data.actorUsername is string
+          && request.resource.data.actorUsername.size() <= 40
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.readAt == null
+          && request.resource.data.keys().hasOnly([
+            'type', 'actorUid', 'recipientUid', 'requestId',
+            'actorName', 'actorUsername', 'createdAt', 'readAt'
+          ])
+          && existsAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId))
+          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == userId
+          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'pending';
+
+        allow update: if ownsUser(userId) && activeMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+          && (request.resource.data.readAt == null
+            || request.resource.data.readAt == request.time);
+
+        allow delete: if ownsUser(userId) && activeMember();
+      }
+
       // A member can manage only their own block list.
       match /blocked/{blockedUid} {
         allow read: if ownsUser(userId) && activeMember();

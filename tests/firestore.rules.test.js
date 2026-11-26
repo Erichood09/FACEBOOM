@@ -46,6 +46,46 @@ async function seed(path, data) {
   });
 }
 
+test('friend-request notifications can only be created atomically for a real request and are private to the recipient', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  const batch = writeBatch(aliceDb);
+  batch.set(doc(aliceDb, 'friendRequests/alice_bob'), {
+    fromUid: 'alice',
+    toUid: 'bob',
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  });
+  batch.set(doc(aliceDb, 'users/bob/notifications/alice_bob'), {
+    type: 'friend_request',
+    actorUid: 'alice',
+    recipientUid: 'bob',
+    requestId: 'alice_bob',
+    actorName: 'Alice',
+    actorUsername: 'alice',
+    createdAt: serverTimestamp(),
+    readAt: null,
+  });
+  await assertSucceeds(batch.commit());
+
+  await assertSucceeds(getDoc(doc(bobDb, 'users/bob/notifications/alice_bob')));
+  await assertFails(getDoc(doc(aliceDb, 'users/bob/notifications/alice_bob')));
+  await assertSucceeds(updateDoc(doc(bobDb, 'users/bob/notifications/alice_bob'), {
+    readAt: serverTimestamp(),
+  }));
+
+  await assertFails(setDoc(doc(aliceDb, 'users/mallory/notifications/fake'), {
+    type: 'friend_request',
+    actorUid: 'alice',
+    recipientUid: 'mallory',
+    requestId: 'alice_mallory',
+    actorName: 'Alice',
+    actorUsername: 'alice',
+    createdAt: serverTimestamp(),
+    readAt: null,
+  }));
+});
+
 test('a member can create only their own profile with their authenticated email', async () => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await deleteDoc(doc(context.firestore(), 'users/alice'));

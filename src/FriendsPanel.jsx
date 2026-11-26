@@ -9,7 +9,6 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
-  setDoc,
   where,
   writeBatch
 } from 'firebase/firestore';
@@ -185,7 +184,8 @@ export default function FriendsPanel({ user, profile, onBack }) {
     try {
       const requestId = `${user.uid}_${person.uid}`;
       const requestRef = doc(db, 'friendRequests', requestId);
-      await setDoc(requestRef, {
+      const batch = writeBatch(db);
+      batch.set(requestRef, {
         fromUid: user.uid,
         toUid: person.uid,
         fromName: profile.fullName || 'FACEBOOM User',
@@ -197,6 +197,17 @@ export default function FriendsPanel({ user, profile, onBack }) {
         status: 'pending',
         createdAt: serverTimestamp()
       });
+      batch.set(doc(collection(db, 'users', person.uid, 'notifications')), {
+        type: 'friend_request',
+        actorUid: user.uid,
+        recipientUid: person.uid,
+        requestId,
+        actorName: profile.fullName || 'FACEBOOM User',
+        actorUsername: profile.username || '',
+        createdAt: serverTimestamp(),
+        readAt: null
+      });
+      await batch.commit();
       setMessage(`Friend request sent to ${person.fullName}.`);
     } catch (err) {
       console.error('Send request error:', err);
