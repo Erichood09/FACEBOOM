@@ -157,6 +157,15 @@ async function handleApi(request, env, url, origin) {
     }, 200, origin);
   }
 
+  if (request.method === 'GET' && url.pathname === '/v1/meta/conversation') {
+    const psid = String(url.searchParams.get('psid') || '');
+    if (!/^\\d{5,30}$/.test(psid)) return json({ error: 'Invalid Messenger conversation.' }, 400, origin);
+    const result = await env.META_DB.prepare(
+      'SELECT message_id, psid, direction, message_text, created_at, delivery_status FROM meta_messages WHERE psid = ? ORDER BY created_at ASC LIMIT 100'
+    ).bind(psid).all();
+    return json({ psid, messages: result.results || [] }, 200, origin);
+  }
+
   if (request.method === 'GET' && url.pathname === '/v1/meta/inbox') {
     const type = url.searchParams.get('type') === 'comments' ? 'comments' : 'messages';
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
