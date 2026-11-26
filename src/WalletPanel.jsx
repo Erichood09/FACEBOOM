@@ -118,7 +118,7 @@ export default function WalletPanel({ user, onBack }) {
   }
 
   return (
-    <section style={{ maxWidth: 760, margin: '0 auto' }}>
+    <section className="fb-wallet-panel" style={{ maxWidth: 760, margin: '0 auto' }}>
       <button type="button" onClick={onBack} style={{ ...primaryButton, background: '#667085', marginBottom: 14 }}>
         Back
       </button>
