@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore } from 'firebase-admin/firestore';
 import { publicPost, publicProfile, normalizeAccountStatus } from '../src/mirror.js';
 
 const sourceProjectId = process.env.FIREBASE_SOURCE_PROJECT_ID || 'faceboom-46273';
@@ -18,7 +18,7 @@ const PAGE_SIZE = 250;
 async function forEachDocument(collectionRef, callback) {
   let cursor = null;
   while (true) {
-    let pageQuery = collectionRef.orderBy('__name__').limit(PAGE_SIZE);
+    let pageQuery = collectionRef.orderBy(FieldPath.documentId()).limit(PAGE_SIZE);
     if (cursor) pageQuery = pageQuery.startAfter(cursor);
     const page = await pageQuery.get();
     if (page.empty) break;
