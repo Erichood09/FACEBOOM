@@ -45,10 +45,17 @@ jobs:
           npm install
           npm run check
 
+      - name: Test Flutterwave test-mode payment worker
+        working-directory: workers/flutterwave-payments
+        run: |
+          npm install
+          npm test
+
       - name: Build application
         env:
           VITE_LIVEKIT_TOKEN_URL: ${{ github.event_name == 'pull_request' && 'https://faceboom-live-token-test2.rolanderic087.workers.dev' || vars.VITE_LIVEKIT_TOKEN_URL }}
           VITE_LIVEKIT_WS_URL: ${{ vars.VITE_LIVEKIT_WS_URL }}
+          VITE_FLUTTERWAVE_API_URL: ${{ vars.VITE_FLUTTERWAVE_API_URL }}
           VITE_FIREBASE_API_KEY: ${{ github.event_name == 'pull_request' && 'AIzaSyCSvsWGBj2wjF3SOfv9_bxpE1JnOfeO1_Y' || '' }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ github.event_name == 'pull_request' && 'faceboom-live-test.firebaseapp.com' || '' }}
           VITE_FIREBASE_PROJECT_ID: ${{ github.event_name == 'pull_request' && 'faceboom-live-test' || '' }}
