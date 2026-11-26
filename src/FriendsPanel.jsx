@@ -197,7 +197,7 @@ export default function FriendsPanel({ user, profile, onBack }) {
         status: 'pending',
         createdAt: serverTimestamp()
       });
-      batch.set(doc(db, 'users', person.uid, 'notifications', requestId), {
+      batch.set(doc(collection(db, 'users', person.uid, 'notifications')), {
         type: 'friend_request',
         actorUid: user.uid,
         recipientUid: person.uid,
