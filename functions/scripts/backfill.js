@@ -67,7 +67,12 @@ async function copyCollection(sourceName, targetName, transform) {
   await forEachDocument(sourceDb.collection(sourceName), async (document) => {
     const safe = transform(document.data(), document.id);
     if (!safe) return;
+    const sourceVersion = document.updateTime;
     batch.set(mirrorDb.doc(`${targetName}/${document.id}`), safe, { merge: true });
+    if (sourceVersion) {
+      batch.set(mirrorDb.doc(`_syncState/${targetName}__${document.id}`), { versionKey: sourceVersion, deleted: false });
+      pending += 1;
+    }
     copied += 1;
     pending += 1;
     if (pending === 450) {
@@ -86,10 +91,13 @@ const postCount = await copyCollection('posts', 'posts', (data) => publicPost(da
 let userCount = 0;
 let blockCount = 0;
 const userWrites = [];
+const blockVersions = new Map();
+const userVersions = new Map();
 await forEachDocument(sourceDb.collection('users'), async (document) => {
   const uid = document.id;
   const status = normalizeAccountStatus(document.data());
   Object.assign(accessFor(uid), status, { updatedAt: new Date() });
+  if (document.updateTime) userVersions.set(uid, document.updateTime);
   userCount += 1;
 
   await forEachDocument(
@@ -99,6 +107,7 @@ await forEachDocument(sourceDb.collection('users'), async (document) => {
       if (blockedUid === uid) return;
       accessFor(uid).ownBlockedIds.add(blockedUid);
       accessFor(blockedUid).blockedByIds.add(uid);
+      if (blockedDocument.updateTime) blockVersions.set(`${uid}__${blockedUid}`, blockedDocument.updateTime);
       blockCount += 1;
     }
   );
@@ -112,6 +121,10 @@ for (const [uid, state] of access.entries()) {
     blockedByIds: [...state.blockedByIds].sort(),
     updatedAt: state.updatedAt
   }]);
+  const sourceVersion = userVersions.get(uid);
+  if (sourceVersion) {
+    userWrites.push([mirrorDb.doc(`_syncState/viewerAccess__${uid}`), { versionKey: sourceVersion, deleted: false }]);
+  }
 }
 const accessCount = await writeInBatches(userWrites);
 
@@ -120,7 +133,7 @@ for (const [uid, state] of access.entries()) {
   for (const blockedUid of state.ownBlockedIds) {
     edgeWrites.push([
       mirrorDb.doc(`blockEdges/${uid}__${blockedUid}`),
-      { blockerUid: uid, blockedUid, exists: true, eventMillis: 0 }
+      { blockerUid: uid, blockedUid, exists: true, eventMillis: 0, ...(blockVersions.has(`${uid}__${blockedUid}`) ? { eventVersion: blockVersions.get(`${uid}__${blockedUid}`) } : {}) }
     ]);
   }
 }
