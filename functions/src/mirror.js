@@ -34,9 +34,9 @@ export function publicPost(data) {
 }
 
 export function normalizeAccountStatus(data = {}) {
-  const status = ['active', 'suspended', 'banned'].includes(data.accountStatus)
-    ? data.accountStatus
-    : 'inactive';
+  const status = data.accountStatus == null
+    ? 'active'
+    : (['active', 'suspended', 'banned'].includes(data.accountStatus) ? data.accountStatus : 'inactive');
   return {
     accountStatus: status,
     suspensionUntil: data.suspensionUntil ?? null
