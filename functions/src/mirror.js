@@ -61,22 +61,26 @@ export function applyBlockEdge(current, blockerUid, blockedUid, exists) {
 
 
 export function shouldApplyMirrorVersion(currentVersion, incomingVersion) {
-  return Number.isFinite(incomingVersion)
-    && incomingVersion > Number(currentVersion || 0);
+  if (typeof incomingVersion === 'number') {
+    return Number.isFinite(incomingVersion) && incomingVersion > Number(currentVersion || 0);
+  }
+  if (typeof incomingVersion !== 'string' || !incomingVersion) return false;
+  if (typeof currentVersion === 'number') return Date.parse(incomingVersion) > currentVersion;
+  return typeof currentVersion !== 'string' || incomingVersion > currentVersion;
 }
 
 // A persistent per-document version record prevents delayed/retried events
 // from resurrecting a deleted document or overwriting a newer mirror value.
-export async function writeVersionedMirrorDocument(db, collection, id, data, versionMillis, merge = false) {
+export async function writeVersionedMirrorDocument(db, collection, id, data, versionKey, merge = false) {
   const targetRef = db.doc(`${collection}/${id}`);
   const stateRef = db.doc(`_syncState/${collection}__${id}`);
   return db.runTransaction(async (transaction) => {
     const state = await transaction.get(stateRef);
-    const currentVersion = state.exists ? Number(state.get('versionMillis') || 0) : 0;
-    if (!shouldApplyMirrorVersion(currentVersion, versionMillis)) return false;
+    const currentVersion = state.exists ? state.get('versionKey') : null;
+    if (!shouldApplyMirrorVersion(currentVersion, versionKey)) return false;
     if (data === null) transaction.delete(targetRef);
     else transaction.set(targetRef, data, ...(merge ? [{ merge: true }] : []));
-    transaction.set(stateRef, { versionMillis, deleted: data === null });
+    transaction.set(stateRef, { versionKey, deleted: data === null });
     return true;
   });
 }
