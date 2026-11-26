@@ -60,13 +60,22 @@ export function applyBlockEdge(current, blockerUid, blockedUid, exists) {
 }
 
 
+function normalizeVersionKey(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(.*?)(?:\\.(\\d+))?Z$/);
+  if (!match) return null;
+  return `${match[1]}.${(match[2] || '').padEnd(9, '0').slice(0, 9)}Z`;
+}
+
 export function shouldApplyMirrorVersion(currentVersion, incomingVersion) {
   if (typeof incomingVersion === 'number') {
     return Number.isFinite(incomingVersion) && incomingVersion > Number(currentVersion || 0);
   }
-  if (typeof incomingVersion !== 'string' || !incomingVersion) return false;
-  if (typeof currentVersion === 'number') return Date.parse(incomingVersion) > currentVersion;
-  return typeof currentVersion !== 'string' || incomingVersion > currentVersion;
+  const incoming = normalizeVersionKey(incomingVersion);
+  if (!incoming) return false;
+  if (typeof currentVersion === 'number') return Date.parse(incoming) > currentVersion;
+  const current = normalizeVersionKey(currentVersion);
+  return !current || incoming > current;
 }
 
 // A persistent per-document version record prevents delayed/retried events
