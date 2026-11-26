@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { safeEqual, verifyWebhookSignature } from './src/index.js';
+import worker, { safeEqual, verifyWebhookSignature, isPageScopedId } from './src/index.js';
 
 test('constant-time comparison rejects mismatched and missing values', () => {
   assert.equal(safeEqual('abc', 'abc'), true);
@@ -54,4 +54,13 @@ test('webhook rejects requests without a valid Meta signature', async () => {
     body: JSON.stringify({ object: 'page', entry: [] })
   }), { META_APP_SECRET: 'secret', META_DB: {} });
   assert.equal(response.status, 401);
+});
+
+test('Messenger page-scoped IDs require 5 to 30 decimal digits', () => {
+  assert.equal(isPageScopedId('12345'), true);
+  assert.equal(isPageScopedId('123456789012345678901234567890'), true);
+  assert.equal(isPageScopedId('1234'), false);
+  assert.equal(isPageScopedId('12345abc'), false);
+  assert.equal(isPageScopedId('\\\\d12345'), false);
+  assert.equal(isPageScopedId(''), false);
 });
