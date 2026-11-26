@@ -55,7 +55,7 @@ function encodeCursor(value) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
 function decodeCursor(value) {
@@ -121,7 +121,7 @@ async function getGoogleAccessToken(env) {
 }
 
 function pemToArrayBuffer(pem) {
-  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, '');
+  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -266,7 +266,7 @@ export default {
       return json({ ok: true, service: 'faceboom-public-data', mode: 'isolated-read-only', configured }, 200, origin);
     }
 
-    const profileMatch = url.pathname.match(/^\\/v1\\/profile\\/([A-Za-z0-9_-]{1,128})$/);
+    const profileMatch = url.pathname.match(/^\/v1\/profile\/([A-Za-z0-9_-]{1,128})$/);
     if (!['/v1/feed', '/v1/directory'].includes(url.pathname) && !profileMatch) {
       return json({ error: 'Not found.' }, 404, origin);
     }
