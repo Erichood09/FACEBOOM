@@ -4,5 +4,6 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-FIREBASE_PROJECT_ID = "faceboom-46273"
+FIREBASE_AUTH_PROJECT_ID = "faceboom-46273"
+FIREBASE_PUBLIC_DATA_PROJECT_ID = ""
 FACEBOOM_ORIGINS = "https://faceboom-46273.web.app"
