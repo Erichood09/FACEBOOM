@@ -269,8 +269,8 @@ export default {
         const documents = await listPublicProfiles(auth.accessToken, auth.projectId);
         const profiles = filterBlockedItems(
           documents.map((item) => ({
-            uid: item.name.split('/').pop(),
-            ...decodeFirestoreFields(item.fields || {})
+            ...decodeFirestoreFields(item.fields || {}),
+            uid: item.name.split('/').pop()
           })),
           auth.ownBlockedIds,
           auth.blockedByIds,
@@ -284,8 +284,8 @@ export default {
       const documents = await runPostsQuery(auth.accessToken, auth.projectId, cursor);
       const posts = filterBlockedItems(
         documents.map((item) => ({
-          id: item.name.split('/').pop(),
-          ...decodeFirestoreFields(item.fields || {})
+          ...decodeFirestoreFields(item.fields || {}),
+          id: item.name.split('/').pop()
         })),
         auth.ownBlockedIds,
         auth.blockedByIds,
