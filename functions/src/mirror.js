@@ -58,3 +58,25 @@ export function applyBlockEdge(current, blockerUid, blockedUid, exists) {
     blockedByIds: [...blockedByIds].sort()
   };
 }
+
+
+export function shouldApplyMirrorVersion(currentVersion, incomingVersion) {
+  return Number.isFinite(incomingVersion)
+    && incomingVersion > Number(currentVersion || 0);
+}
+
+// A persistent per-document version record prevents delayed/retried events
+// from resurrecting a deleted document or overwriting a newer mirror value.
+export async function writeVersionedMirrorDocument(db, collection, id, data, versionMillis) {
+  const targetRef = db.doc(`${collection}/${id}`);
+  const stateRef = db.doc(`_syncState/${collection}__${id}`);
+  return db.runTransaction(async (transaction) => {
+    const state = await transaction.get(stateRef);
+    const currentVersion = state.exists ? Number(state.get('versionMillis') || 0) : 0;
+    if (!shouldApplyMirrorVersion(currentVersion, versionMillis)) return false;
+    if (data === null) transaction.delete(targetRef);
+    else transaction.set(targetRef, data);
+    transaction.set(stateRef, { versionMillis, deleted: data === null });
+    return true;
+  });
+}
