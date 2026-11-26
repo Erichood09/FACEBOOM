@@ -58,6 +58,13 @@ jobs:
           npm install
           npm test
 
+      - name: Test Meta Messenger and Page comments bridge
+        working-directory: workers/meta-bridge
+        run: |
+          npm install
+          npm test
+          npm run check
+
       - name: Test Flutterwave test-mode payment worker
         working-directory: workers/flutterwave-payments
         run: |
