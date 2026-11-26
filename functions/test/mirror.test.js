@@ -5,7 +5,8 @@ import {
   applyBlockEdge,
   normalizeAccountStatus,
   publicPost,
-  publicProfile
+  publicProfile,
+  shouldApplyMirrorVersion
 } from '../src/mirror.js';
 
 test('public profile copies only the explicit public allowlist', () => {
@@ -67,4 +68,12 @@ test('block edge updates both sides idempotently', () => {
 test('allowlist helper rejects non-record inputs', () => {
   assert.equal(allowlistedFields(null, ['uid']), null);
   assert.equal(allowlistedFields(['uid'], ['uid']), null);
+});
+
+
+test('mirror event versions reject stale and duplicate deliveries', () => {
+  assert.equal(shouldApplyMirrorVersion(100, 101), true);
+  assert.equal(shouldApplyMirrorVersion(101, 101), false);
+  assert.equal(shouldApplyMirrorVersion(101, 99), false);
+  assert.equal(shouldApplyMirrorVersion(0, Number.NaN), false);
 });
