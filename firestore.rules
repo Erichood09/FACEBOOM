@@ -259,7 +259,11 @@ service cloud.firestore {
 
       // LIKES
       match /likes/{likeId} {
-        allow read: if activeMember();
+        allow read: if activeMember()
+          && !blockedEither(
+            request.auth.uid,
+            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
+          );
 
         allow create: if activeMember()
           && likeId == request.auth.uid
