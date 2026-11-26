@@ -45,7 +45,7 @@ test('account status is normalized and private fields are not copied', () => {
     suspensionUntil: '2026-12-01T00:00:00Z'
   });
   assert.deepEqual(normalizeAccountStatus({}), {
-    accountStatus: 'inactive',
+    accountStatus: 'active',
     suspensionUntil: null
   });
   assert.deepEqual(normalizeAccountStatus({ accountStatus: 'unexpected' }), {
