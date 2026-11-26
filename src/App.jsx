@@ -5,6 +5,7 @@ import MessagesPanel from './MessagesPanel';
 import SafetyActions from './SafetyActions';
 import ShareActions from './ShareActions';
 import ModeratorPanel from './ModeratorPanel';
+import LivePanel from './LivePanel';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -67,6 +68,7 @@ function App() {
   const [showFriends, setShowFriends] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [showModerator, setShowModerator] = useState(false);
+  const [showLive, setShowLive] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
   const [accountCheckComplete, setAccountCheckComplete] = useState(false);
@@ -1115,6 +1117,7 @@ function App() {
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
+              setShowLive(false);
               setEditingProfile(false);
             }}
           >
@@ -1128,6 +1131,7 @@ function App() {
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
+              setShowLive(false);
               setEditingProfile(false);
               setProfileMessage('');
               setProfileError('');
@@ -1142,6 +1146,7 @@ function App() {
               setShowProfile(false);
               setShowMessages(false);
               setShowModerator(false);
+              setShowLive(false);
               setEditingProfile(false);
               setShowFriends(true);
             }}
@@ -1156,10 +1161,25 @@ function App() {
               setShowFriends(false);
               setShowMessages(true);
               setShowModerator(false);
+              setShowLive(false);
               setEditingProfile(false);
             }}
           >
             Messages
+          </button>
+
+          <button
+            style={headerButtonStyle}
+            onClick={() => {
+              setShowProfile(false);
+              setShowFriends(false);
+              setShowMessages(false);
+              setShowModerator(false);
+              setShowLive(true);
+              setEditingProfile(false);
+            }}
+          >
+            🔴 Live
           </button>
 
           {isModerator && (
@@ -1170,6 +1190,7 @@ function App() {
                 setShowFriends(false);
                 setShowMessages(false);
                 setShowModerator(true);
+                setShowLive(false);
                 setEditingProfile(false);
               }}
             >
@@ -1240,6 +1261,8 @@ function App() {
           </div>
         ) : showModerator && isModerator ? (
           <ModeratorPanel user={user} onBack={() => setShowModerator(false)} />
+        ) : showLive ? (
+          <LivePanel user={user} profile={profile} onBack={() => setShowLive(false)} />
         ) : showMessages ? (
           <MessagesPanel
             user={user}

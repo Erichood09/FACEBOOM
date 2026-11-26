@@ -1,0 +1,12 @@
+name = "faceboom-live-token"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_IDS = "faceboom-46273,faceboom-live-test"
+FACEBOOM_ORIGINS = "https://faceboom-46273.web.app,https://faceboom-46273--pr-3-c7h0oysl.web.app"
+
+[previews.vars]
+FIREBASE_PROJECT_IDS = "faceboom-46273,faceboom-live-test"
+FACEBOOM_ORIGINS = "https://faceboom-46273.web.app,https://faceboom-46273--pr-3-c7h0oysl.web.app"

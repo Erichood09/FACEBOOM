@@ -1,5 +1,10 @@
 name: FACEBOOM build and Firebase deployment
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -34,7 +39,22 @@ jobs:
       - name: Test Firestore security rules
         run: npm run test:rules
 
+      - name: Validate secure LiveKit token worker
+        working-directory: workers/livekit-token
+        run: |
+          npm install
+          npm run check
+
       - name: Build application
+        env:
+          VITE_LIVEKIT_TOKEN_URL: ${{ github.event_name == 'pull_request' && 'https://faceboom-live-token-test2.rolanderic087.workers.dev' || vars.VITE_LIVEKIT_TOKEN_URL }}
+          VITE_LIVEKIT_WS_URL: ${{ vars.VITE_LIVEKIT_WS_URL }}
+          VITE_FIREBASE_API_KEY: ${{ github.event_name == 'pull_request' && 'AIzaSyCSvsWGBj2wjF3SOfv9_bxpE1JnOfeO1_Y' || '' }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ github.event_name == 'pull_request' && 'faceboom-live-test.firebaseapp.com' || '' }}
+          VITE_FIREBASE_PROJECT_ID: ${{ github.event_name == 'pull_request' && 'faceboom-live-test' || '' }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ github.event_name == 'pull_request' && 'faceboom-live-test.firebasestorage.app' || '' }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ github.event_name == 'pull_request' && '136081680775' || '' }}
+          VITE_FIREBASE_APP_ID: ${{ github.event_name == 'pull_request' && '1:136081680775:web:476178ab8d6daec8734b22' || '' }}
         run: npm run build
 
       - name: Deploy Firestore rules through the Firebase Rules API
@@ -89,3 +109,13 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
           projectId: faceboom-46273
           channelId: live
+
+      - name: Deploy Firebase Hosting preview
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FACEBOOM_46273 }}
+          projectId: faceboom-46273
+          channelId: pr-${{ github.event.pull_request.number }}
+          expires: 7d
