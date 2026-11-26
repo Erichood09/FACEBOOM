@@ -365,7 +365,7 @@ function App() {
       if (secureDataApi) {
         try {
           const token = await user.getIdToken();
-          const response = await fetch(`${secureDataApi.replace(/\\/$/, '')}/v1/feed`, {
+          const response = await fetch(`${secureDataApi.replace(/\/$/, '')}/v1/feed`, {
             headers: { Authorization: `Bearer ${token}` },
             cache: 'no-store'
           });
