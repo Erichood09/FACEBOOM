@@ -71,6 +71,6 @@ The pure allowlist and block-state helpers have Node tests in `functions/test/mi
 ## Current status and blockers
 
 - Synchronizer source code, allowlist helpers, tests, Worker mirror-only reads, and shared-profile API routing are committed on the preparation branch.
-- No separate cloud project has been created, no event handler or Worker has been deployed, no backfill has run, and no production site or rules have changed.
+- Separate public-data project created: `faceboom-public-data`. Firestore database location and setup are still pending. No event handler or Worker has been deployed, no backfill has run, and no production site or rules have changed.
 - Project creation and deployment may require enabling billing. Do not enable billing or paid services without explicit approval.
 - Do not merge the deployment PR or deploy production as part of this preparation step.
