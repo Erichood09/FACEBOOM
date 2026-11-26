@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { safeEqual, verifyWebhookSignature, isPageScopedId } from './src/index.js';
+import worker, { safeEqual, verifyWebhookSignature, isPageScopedId, createAppSecretProof } from './src/index.js';
 
 test('constant-time comparison rejects mismatched and missing values', () => {
   assert.equal(safeEqual('abc', 'abc'), true);
@@ -63,4 +63,10 @@ test('Messenger page-scoped IDs require 5 to 30 decimal digits', () => {
   assert.equal(isPageScopedId('12345abc'), false);
   assert.equal(isPageScopedId('abc12345'), false);
   assert.equal(isPageScopedId(''), false);
+});
+
+test('Meta app secret proof is a SHA-256 HMAC hex digest', async () => {
+  const proof = await createAppSecretProof('page-token', 'app-secret');
+  assert.match(proof, /^[a-f0-9]{64}$/);
+  assert.notEqual(proof, await createAppSecretProof('other-token', 'app-secret'));
 });
