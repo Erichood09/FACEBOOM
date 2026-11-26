@@ -42,7 +42,7 @@ export function decodeFirestoreFields(fields = {}) {
   );
 }
 
-export function filterBlockedItems(items, ownBlockedIds, blockedByIds, viewerUid, key = 'authorId') {
+export function filterBlockedItems(items, ownBlockedIds = [], blockedByIds = [], viewerUid, key = 'authorId') {
   const hidden = new Set([...ownBlockedIds, ...blockedByIds]);
   return items.filter((item) =>
     item[key]
@@ -55,7 +55,7 @@ function encodeCursor(value) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return btoa(binary).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
 }
 
 function decodeCursor(value) {
@@ -82,7 +82,7 @@ async function getGoogleAccessToken(env) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.');
   }
   if (!serviceAccount.client_email || !serviceAccount.private_key) {
-    throw new Error('Firebase service account secret is incomplete.');
+    throw new Error('Public-data Worker identity secret is incomplete.');
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -111,7 +111,7 @@ async function getGoogleAccessToken(env) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.access_token) {
-    throw new Error('Google did not issue a Firestore access token.');
+    throw new Error('Google did not issue a public-data Firestore access token.');
   }
   cachedGoogleToken = {
     value: result.access_token,
@@ -121,7 +121,7 @@ async function getGoogleAccessToken(env) {
 }
 
 function pemToArrayBuffer(pem) {
-  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, '');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -135,7 +135,7 @@ async function firestoreRequest(path, accessToken, projectId) {
   });
   if (!response.ok) {
     if (response.status === 404) return null;
-    throw new Error(`Firestore read failed with status ${response.status}.`);
+    throw new Error(`Public mirror Firestore read failed with status ${response.status}.`);
   }
   return response.json();
 }
@@ -151,29 +151,28 @@ async function listCollection(path, accessToken, projectId, pageSize = 1000) {
     docs.push(...(result.documents || []));
     pageToken = result.nextPageToken || '';
   } while (pageToken && docs.length < 10_000);
-  if (pageToken) throw new Error('Block list is too large to safely evaluate.');
+  if (pageToken) throw new Error('Public mirror collection is too large to safely evaluate.');
   return docs;
 }
 
 async function loadViewerContext(uid, projectId, accessToken) {
-  const [userDocument, ownBlocks, blockedBy] = await Promise.all([
-    firestoreRequest(`users/${encodeURIComponent(uid)}`, accessToken, projectId),
-    listCollection(`users/${encodeURIComponent(uid)}/blocked`, accessToken, projectId),
-    listCollection(`users/${encodeURIComponent(uid)}/blockedBy`, accessToken, projectId)
-  ]);
-  if (!userDocument) return { error: 'FACEBOOM account was not found.', status: 403 };
-  const user = decodeFirestoreFields(userDocument.fields || {});
-  const active = user.accountStatus === 'active'
-    || (user.accountStatus === 'suspended'
-      && user.suspensionUntil
-      && Date.parse(user.suspensionUntil) <= Date.now());
+  const document = await firestoreRequest(
+    `viewerAccess/${encodeURIComponent(uid)}`,
+    accessToken,
+    projectId
+  );
+  if (!document) return { error: 'FACEBOOM account access record was not found.', status: 403 };
+  const viewer = decodeFirestoreFields(document.fields || {});
+  const active = viewer.accountStatus === 'active'
+    || (viewer.accountStatus === 'suspended'
+      && viewer.suspensionUntil
+      && Date.parse(viewer.suspensionUntil) <= Date.now());
   if (!active) {
     return { error: 'This account cannot access the public feed or directory.', status: 403 };
   }
   return {
-    user,
-    ownBlockedIds: ownBlocks.map((item) => item.name.split('/').pop()),
-    blockedByIds: blockedBy.map((item) => item.name.split('/').pop())
+    ownBlockedIds: Array.isArray(viewer.ownBlockedIds) ? viewer.ownBlockedIds : [],
+    blockedByIds: Array.isArray(viewer.blockedByIds) ? viewer.blockedByIds : []
   };
 }
 
@@ -205,26 +204,28 @@ async function runPostsQuery(accessToken, projectId, cursor) {
     body: JSON.stringify({ structuredQuery })
   });
   const result = await response.json().catch(() => []);
-  if (!response.ok) throw new Error(`Feed query failed with status ${response.status}.`);
+  if (!response.ok) throw new Error(`Public mirror feed query failed with status ${response.status}.`);
   return (Array.isArray(result) ? result : [])
     .map((entry) => entry.document)
     .filter(Boolean);
-}
-
-async function listPublicProfiles(accessToken, projectId) {
-  return listCollection('publicProfiles', accessToken, projectId, PAGE_SIZE);
 }
 
 async function authenticate(request, env) {
   const authorization = request.headers.get('Authorization') || '';
   const idToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   if (!idToken) return { error: 'Sign in to FACEBOOM first.', status: 401 };
-  const projectId = env.FIREBASE_PROJECT_ID || 'faceboom-46273';
+
+  const authProjectId = env.FIREBASE_AUTH_PROJECT_ID || 'faceboom-46273';
+  const publicDataProjectId = env.FIREBASE_PUBLIC_DATA_PROJECT_ID || '';
+  if (!publicDataProjectId || publicDataProjectId === authProjectId) {
+    return { error: 'The isolated public-data project is not configured.', status: 503 };
+  }
+
   let payload;
   try {
     const verified = await jwtVerify(idToken, FIREBASE_KEYS, {
-      issuer: `https://securetoken.google.com/${projectId}`,
-      audience: projectId
+      issuer: `https://securetoken.google.com/${authProjectId}`,
+      audience: authProjectId
     });
     payload = verified.payload;
   } catch {
@@ -233,10 +234,11 @@ async function authenticate(request, env) {
   if (!payload.sub || typeof payload.sub !== 'string') {
     return { error: 'Your sign-in session is invalid.', status: 401 };
   }
+
   const accessToken = await getGoogleAccessToken(env);
-  const context = await loadViewerContext(payload.sub, projectId, accessToken);
+  const context = await loadViewerContext(payload.sub, publicDataProjectId, accessToken);
   if (context.error) return context;
-  return { uid: payload.sub, projectId, accessToken, ...context };
+  return { uid: payload.sub, projectId: publicDataProjectId, accessToken, ...context };
 }
 
 export default {
@@ -259,9 +261,13 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === '/v1/health') {
-      return json({ ok: true, service: 'faceboom-public-data', mode: 'read-only' }, 200, origin);
+      const configured = Boolean(env.FIREBASE_PUBLIC_DATA_PROJECT_ID)
+        && env.FIREBASE_PUBLIC_DATA_PROJECT_ID !== (env.FIREBASE_AUTH_PROJECT_ID || 'faceboom-46273');
+      return json({ ok: true, service: 'faceboom-public-data', mode: 'isolated-read-only', configured }, 200, origin);
     }
-    if (!['/v1/feed', '/v1/directory'].includes(url.pathname)) {
+
+    const profileMatch = url.pathname.match(/^\\/v1\\/profile\\/([A-Za-z0-9_-]{1,128})$/);
+    if (!['/v1/feed', '/v1/directory'].includes(url.pathname) && !profileMatch) {
       return json({ error: 'Not found.' }, 404, origin);
     }
 
@@ -270,7 +276,8 @@ export default {
       if (auth.error) return json({ error: auth.error }, auth.status, origin);
 
       if (url.pathname === '/v1/directory') {
-        const documents = await listPublicProfiles(auth.accessToken, auth.projectId);
+        const result = await firestoreRequest('publicProfiles', auth.accessToken, auth.projectId);
+        const documents = await listCollection('publicProfiles', auth.accessToken, auth.projectId, PAGE_SIZE);
         const profiles = filterBlockedItems(
           documents.map((item) => ({
             ...decodeFirestoreFields(item.fields || {}),
@@ -280,8 +287,24 @@ export default {
           auth.blockedByIds,
           auth.uid,
           'uid'
-        ).filter((profile) => profile.uid !== auth.uid);
+        );
         return json({ profiles: profiles.slice(0, PAGE_SIZE) }, 200, origin);
+      }
+
+      if (profileMatch) {
+        const uid = profileMatch[1];
+        if (uid === auth.uid || auth.ownBlockedIds.includes(uid) || auth.blockedByIds.includes(uid)) {
+          return json({ error: 'This profile is not available.' }, 404, origin);
+        }
+        const document = await firestoreRequest(
+          `publicProfiles/${encodeURIComponent(uid)}`,
+          auth.accessToken,
+          auth.projectId
+        );
+        if (!document) return json({ error: 'This profile is not available.' }, 404, origin);
+        return json({
+          profile: { ...decodeFirestoreFields(document.fields || {}), uid }
+        }, 200, origin);
       }
 
       const cursor = decodeCursor(url.searchParams.get('cursor'));
@@ -302,7 +325,7 @@ export default {
         : null;
       return json({ posts, nextCursor }, 200, origin);
     } catch (error) {
-      console.error('Public data worker error:', error?.message || 'Unknown error');
+      console.error('Public data Worker error:', error?.message || 'Unknown error');
       return json({ error: 'Unable to load FACEBOOM public data right now.' }, 500, origin);
     }
   }
