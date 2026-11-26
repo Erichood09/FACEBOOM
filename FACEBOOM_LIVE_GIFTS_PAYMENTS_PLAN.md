@@ -55,3 +55,14 @@ A creator's available balance is derived from verified gift earnings minus compl
 - No Flutterwave secret key is configured in the Worker.
 - No payment ledger database is provisioned.
 - Therefore no real payment or payout endpoint is active, and no payment is being collected.
+
+
+## Implementation status — 26 November 2026
+
+- Stage 1 is implemented: free animated Live gifts are available without money or creator earnings.
+- A test-only Flutterwave wallet foundation is under review in PR #7. It includes server-owned package pricing, hosted checkout, signed webhooks, server-side transaction verification, and an idempotent D1 coin ledger.
+- The Wallet screen is present in the feature branch. It remains unavailable for purchases until the separate Worker, D1 database, Flutterwave test secrets, and an approved coin package are configured.
+- No active package prices or coin quantities have been selected. Do not activate package rows until the owner confirms them.
+- Paid gift delivery during Live, creator earnings, KYC, withdrawals, refunds, and chargeback handling are not yet implemented.
+- Merchant onboarding is still pending Flutterwave support clarification for the locked Trading Name field. The support request reference recorded in the prior setup is FLW-617615. Do not submit the personal name as the FACEBOOM trading name or invent business registration details.
+- Real-money collection and payouts remain disabled. This implementation is test-only and does not contain a live-payment switch.
