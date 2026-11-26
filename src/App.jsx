@@ -316,16 +316,16 @@ function App() {
       setSharedProfile(null);
       setSharedProfileError('');
       setShowProfile(true);
-              setShowNotifications(false);
-              setShowWallet(false);
+      setShowNotifications(false);
+      setShowWallet(false);
       setShowFriends(false);
       setShowMessages(false);
       return undefined;
     }
 
     setShowProfile(false);
-              setShowNotifications(false);
-              setShowWallet(false);
+    setShowNotifications(false);
+    setShowWallet(false);
     setShowFriends(false);
     setShowMessages(false);
     let active = true;
@@ -644,8 +644,8 @@ function App() {
     try {
       await signOut(auth);
       setShowProfile(false);
-              setShowNotifications(false);
-              setShowWallet(false);
+      setShowNotifications(false);
+      setShowWallet(false);
       setShowFriends(false);
       setShowMessages(false);
       setShowModerator(false);
