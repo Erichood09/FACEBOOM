@@ -7,6 +7,7 @@ import ShareActions from './ShareActions';
 import ModeratorPanel from './ModeratorPanel';
 import LivePanel from './LivePanel';
 import NotificationsPanel from './NotificationsPanel';
+import WalletPanel from './WalletPanel';
 
 import { auth, db } from './firebase';
 import { uploadToCloudinary } from './cloudinary';
@@ -71,6 +72,7 @@ function App() {
   const [showModerator, setShowModerator] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
   const [accountCheckComplete, setAccountCheckComplete] = useState(false);
@@ -315,6 +317,7 @@ function App() {
       setSharedProfileError('');
       setShowProfile(true);
               setShowNotifications(false);
+              setShowWallet(false);
       setShowFriends(false);
       setShowMessages(false);
       return undefined;
@@ -322,6 +325,7 @@ function App() {
 
     setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
     setShowFriends(false);
     setShowMessages(false);
     let active = true;
@@ -641,6 +645,7 @@ function App() {
       await signOut(auth);
       setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
       setShowFriends(false);
       setShowMessages(false);
       setShowModerator(false);
@@ -1120,6 +1125,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1135,6 +1141,7 @@ function App() {
             onClick={() => {
               setShowProfile(true);
               setShowNotifications(false);
+              setShowWallet(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1152,6 +1159,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
               setShowMessages(false);
               setShowModerator(false);
               setShowLive(false);
@@ -1167,6 +1175,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1183,6 +1192,24 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
+              setShowFriends(false);
+              setShowMessages(false);
+              setShowModerator(false);
+              setShowLive(false);
+              setShowWallet(true);
+              setEditingProfile(false);
+            }}
+          >
+            Wallet
+          </button>
+
+          <button
+            style={headerButtonStyle}
+            onClick={() => {
+              setShowProfile(false);
+              setShowNotifications(false);
+              setShowWallet(false);
               setShowFriends(false);
               setShowMessages(true);
               setShowModerator(false);
@@ -1198,6 +1225,7 @@ function App() {
             onClick={() => {
               setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
               setShowFriends(false);
               setShowMessages(false);
               setShowModerator(false);
@@ -1214,6 +1242,7 @@ function App() {
               onClick={() => {
                 setShowProfile(false);
               setShowNotifications(false);
+              setShowWallet(false);
                 setShowFriends(false);
                 setShowMessages(false);
                 setShowModerator(true);
@@ -1286,6 +1315,8 @@ function App() {
               url={`${window.location.origin}${window.location.pathname}?profile=${sharedProfile.uid}`}
             />
           </div>
+        ) : showWallet ? (
+          <WalletPanel user={user} onBack={() => setShowWallet(false)} />
         ) : showNotifications ? (
           <NotificationsPanel user={user} onBack={() => setShowNotifications(false)} />
         ) : showModerator && isModerator ? (
