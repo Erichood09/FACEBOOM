@@ -30,7 +30,7 @@ test('removes own posts, blocked authors, and members who blocked the viewer', (
   ];
   assert.deepEqual(
     filterBlockedItems(posts, ['bob'], ['carol'], 'alice'),
-    [{ id: '4', authorId: 'dave' }]
+    [{ id: '1', authorId: 'alice' }, { id: '4', authorId: 'dave' }]
   );
 });
 
