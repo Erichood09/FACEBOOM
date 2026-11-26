@@ -61,6 +61,6 @@ test('Messenger page-scoped IDs require 5 to 30 decimal digits', () => {
   assert.equal(isPageScopedId('123456789012345678901234567890'), true);
   assert.equal(isPageScopedId('1234'), false);
   assert.equal(isPageScopedId('12345abc'), false);
-  assert.equal(isPageScopedId('\\\\d12345'), false);
+  assert.equal(isPageScopedId('abc12345'), false);
   assert.equal(isPageScopedId(''), false);
 });
