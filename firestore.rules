@@ -284,7 +284,11 @@ service cloud.firestore {
 
       // COMMENTS
       match /comments/{commentId} {
-        allow read: if activeMember();
+        allow read: if activeMember()
+          && !blockedEither(
+            request.auth.uid,
+            get(/databases/$(database)/documents/posts/$(postId)).data.authorId
+          );
 
         allow create: if activeMember()
           && request.resource.data.authorId == request.auth.uid
