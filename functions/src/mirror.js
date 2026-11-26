@@ -62,7 +62,7 @@ export function applyBlockEdge(current, blockerUid, blockedUid, exists) {
 
 function normalizeVersionKey(value) {
   if (typeof value !== 'string') return null;
-  const match = value.match(/^(.*?)(?:\\.(\\d+))?Z$/);
+  const match = value.match(/^(.*?)(?:\.(\d+))?Z$/);
   if (!match) return null;
   return `${match[1]}.${(match[2] || '').padEnd(9, '0').slice(0, 9)}Z`;
 }
