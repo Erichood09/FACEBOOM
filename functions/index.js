@@ -74,7 +74,12 @@ export const mirrorAccountAccess = onDocumentWritten(
   async (event) => {
     const uid = event.params.uid;
     const after = event.data?.after;
-    if (!after?.exists) return;
+    if (!after?.exists) {
+      await mirrorDb().doc(`viewerAccess/${uid}`).delete().catch((error) => {
+        if (error.code !== 5) throw error;
+      });
+      return;
+    }
     const account = normalizeAccountStatus(after.data());
     const ref = mirrorDb().doc(`viewerAccess/${uid}`);
     await ref.set({
