@@ -74,8 +74,9 @@ export function shouldApplyMirrorVersion(currentVersion, incomingVersion) {
   const incoming = normalizeVersionKey(incomingVersion);
   if (!incoming) return false;
   if (typeof currentVersion === 'number') return Date.parse(incoming) > currentVersion;
+  if (currentVersion == null) return true;
   const current = normalizeVersionKey(currentVersion);
-  return !current || incoming > current;
+  return Boolean(current && incoming > current);
 }
 
 // A persistent per-document version record prevents delayed/retried events
