@@ -293,7 +293,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
         <button type="button" style={buttonStyle} onClick={onBack}>Back to Home</button>
       </div>
       {error && <p style={{ color: '#b42318' }}>{error}</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(230px, 0.85fr) minmax(280px, 1.5fr)', gap: 14 }}>
+      <div className="fb-messages-layout">
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Your Inbox</h3>
           {visibleConversations.length === 0 && <p style={{ color: '#666' }}>No conversations yet. Search for a member below to send the first message.</p>}
@@ -342,7 +342,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
                   </div>;
                 })}
               </div>
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <form className="fb-messages-composer" onSubmit={sendMessage}>
                 <input value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} placeholder="Write a private message..." style={{ flex: 1, minWidth: 0, padding: 11, border: '1px solid #ccc', borderRadius: 8 }} />
                 <button type="submit" disabled={sending || !draft.trim()} style={{ ...buttonStyle, background: '#1877f2', color: '#fff', borderColor: '#1877f2', opacity: sending || !draft.trim() ? 0.6 : 1 }}>{sending ? 'Sending...' : 'Send'}</button>
               </form>
@@ -350,7 +350,6 @@ export default function MessagesPanel({ user, profile, onBack }) {
           )}
         </div>
       </div>
-      <style>{`@media (max-width: 680px) { section > div:nth-of-type(2) { grid-template-columns: 1fr !important; } }`}</style>
     </section>
   );
 }
