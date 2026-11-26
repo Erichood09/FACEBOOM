@@ -6,5 +6,3 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 FIREBASE_PROJECT_ID = "faceboom-46273"
 FACEBOOM_ORIGINS = "https://faceboom-46273.web.app"
-
-[preview]
