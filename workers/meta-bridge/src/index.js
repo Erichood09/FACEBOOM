@@ -68,11 +68,25 @@ function cleanText(value) {
   return typeof value === 'string' ? value.trim().slice(0, MAX_TEXT_LENGTH) : '';
 }
 
+async function createAppSecretProof(accessToken, appSecret) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(appSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(accessToken));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function graphRequest(path, body, env) {
   if (!env.META_PAGE_ACCESS_TOKEN) throw new Error('Facebook Page access token is not configured.');
+  if (!env.META_APP_SECRET) throw new Error('Meta app secret is not configured.');
   const version = env.META_GRAPH_API_VERSION || GRAPH_VERSION;
   const url = new URL(`https://graph.facebook.com/${version}/${path}`);
   url.searchParams.set('access_token', env.META_PAGE_ACCESS_TOKEN);
+  url.searchParams.set('appsecret_proof', await createAppSecretProof(env.META_PAGE_ACCESS_TOKEN, env.META_APP_SECRET));
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -256,4 +270,4 @@ export default {
   }
 };
 
-export { safeEqual, verifyWebhookSignature, authenticateModerator, isPageScopedId };
+export { safeEqual, verifyWebhookSignature, authenticateModerator, isPageScopedId, createAppSecretProof };
