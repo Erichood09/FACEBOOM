@@ -1736,7 +1736,8 @@ function App() {
                         <video
                           src={item.mediaUrl}
                           controls
-                          preload="metadata"
+                          preload="none"
+                          playsInline
                           style={postMediaStyle}
                         >
                           Your browser does not support video playback.
@@ -1746,6 +1747,7 @@ function App() {
                           src={item.mediaUrl}
                           alt="Post attachment"
                           loading="lazy"
+                          decoding="async"
                           style={postMediaStyle}
                         />
                       )}
