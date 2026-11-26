@@ -49,3 +49,40 @@ The public-data synchronizer and mirror Worker code from the earlier isolation e
 ## Feature preservation
 
 This architecture does not intentionally remove the existing website features. In particular, retain private one-to-one messaging, conversation history, inbox summaries, post comments, likes, profiles, friends, photo/video posts and Cloudinary media. Any feature whose secure behavior cannot be proven by the current rules/tests must be marked as pending verification, not described as complete.
+
+
+## Facebook Lite-style experience and official Facebook interoperability
+
+### FACEBOOM lightweight experience
+
+The product direction is a lightweight, mobile-first website inspired by the simplicity and data efficiency of Facebook Lite. This means:
+- Fast initial loading and small JavaScript bundles; lazy-load noncritical screens and media.
+- Responsive, simple navigation and readable feed cards.
+- Compressed/lazy-loaded image previews where possible; do not autoplay large videos by default.
+- Clear low-data behavior and graceful loading/error states.
+- Core social workflows remain first-class: profiles, friend discovery/requests, feed, likes, comments, notifications, and private one-to-one FACEBOOM messages.
+- Preserve accessible controls, secure authentication and privacy rules. Do not copy Meta branding, proprietary assets, or imply FACEBOOM is an official Facebook product.
+
+### Facebook interoperability: supported scope and limits
+
+FACEBOOM must not claim that it can freely message any personal Facebook account or comment on every personal Facebook profile/post. Meta controls access through its official APIs, permissions, review, Page roles, tokens, messaging windows and platform policies.
+
+Potentially supportable integration, subject to a Meta developer app, asset ownership/admin authorization, required permissions, App Review and policy compliance:
+- Connect a Facebook Page that the FACEBOOM operator or an authorized customer administers.
+- Read/manage eligible Page posts and comments with the approved Pages API permissions (for example, pages_read_engagement, pages_read_user_content and pages_manage_engagement, as applicable).
+- Connect the Page's Messenger experience using the Messenger Platform and approved pages_messaging permissions, allowing permitted conversations with people who message that Page.
+- Provide a clearly labeled Facebook Page inbox/comments integration, separate from FACEBOOM member-to-member conversations and comments.
+
+Not promised / not to implement using scraping, browser automation, password collection or unofficial APIs:
+- Access to arbitrary personal Facebook inboxes or private messages between two people.
+- Sending a Messenger message from a person's personal account as if FACEBOOM were Facebook/Messenger.
+- Reading or posting comments on arbitrary personal profiles, private groups or posts without the required object access and authorization.
+- Importing Facebook Lite's private code, internal APIs, user data or proprietary assets.
+
+### Product behavior
+
+- FACEBOOM-to-FACEBOOM messaging and comments remain native features stored in FACEBOOM Firestore.
+- Facebook Page conversations/comments, if later approved and configured, must be clearly identified as Facebook Page interactions and stored/processed through a secure approved integration. Never merge identities or imply a Facebook user is a FACEBOOM account.
+- Keep Meta access tokens and app secrets server-side only; never put them in Vite client variables, GitHub source, or user-visible chat.
+- Before implementing the Meta connection, obtain the Page owner/admin's explicit authorization, create/configure a Meta developer app, confirm the exact supported permissions and App Review requirements, and separately approve any backend/billing requirement.
+- The current no-billing release does not include a live Meta API connection. This remains a separately gated future integration, not a completed feature.
