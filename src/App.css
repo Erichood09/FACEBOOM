@@ -481,3 +481,44 @@ video {
     background: #eef5ff;
   }
 }
+
+
+/* Responsive private messaging layout. */
+.fb-messages-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.85fr) minmax(280px, 1.5fr);
+  gap: 14px;
+  min-width: 0;
+}
+.fb-messages-layout > div {
+  min-width: 0;
+}
+.fb-messages-composer {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.fb-messages-composer input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 680px) {
+  .fb-messages-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fb-messages-layout > div {
+    padding: 13px !important;
+  }
+  .fb-messages-composer button {
+    flex: 0 0 auto;
+  }
+}
+@media (max-width: 380px) {
+  .fb-messages-composer {
+    flex-direction: column;
+  }
+  .fb-messages-composer button {
+    width: 100%;
+    min-height: 42px;
+  }
+}
