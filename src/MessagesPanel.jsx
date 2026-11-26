@@ -67,7 +67,7 @@ export default function MessagesPanel({ user, profile, onBack }) {
         const secureDataApi = import.meta.env.VITE_PUBLIC_DATA_API_URL || '';
         if (secureDataApi) {
           const token = await user.getIdToken();
-          const response = await fetch(`${secureDataApi.replace(/\/$/, '')}/v1/directory`, {
+          const response = await fetch(`${(secureDataApi.endsWith('/') ? secureDataApi.slice(0, -1) : secureDataApi)}/v1/directory`, {
             headers: { Authorization: `Bearer ${token}` },
             cache: 'no-store'
           });
