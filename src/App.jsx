@@ -369,15 +369,21 @@ function App() {
     const unsubscribe = onSnapshot(
       postsQuery,
       (snapshot) => {
+        const hiddenMemberIds = new Set(blockedUserIds);
         const loadedPosts = snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data()
-        })).sort((a, b) => {
-          const time = (value) => value?.toMillis
-            ? value.toMillis()
-            : new Date(value || 0).getTime();
-          return time(b.createdAt) - time(a.createdAt);
-        });
+        }))
+          // The Firestore not-in query is limited to 30 IDs. When the block
+          // list is larger, the fallback query is broad, so always filter the
+          // snapshot before placing posts in the visible feed.
+          .filter((item) => !hiddenMemberIds.has(item.authorId))
+          .sort((a, b) => {
+            const time = (value) => value?.toMillis
+              ? value.toMillis()
+              : new Date(value || 0).getTime();
+            return time(b.createdAt) - time(a.createdAt);
+          });
 
         setPosts(loadedPosts);
         setFeedLoading(false);
