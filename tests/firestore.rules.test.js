@@ -221,6 +221,8 @@ test('blocking prevents new likes and comments on the other member posts', async
   }));
 
   await seed('users/bob/blocked/alice', { uid: 'alice' });
+  await assertFails(getDocs(collection(aliceDb, 'posts/post-2/likes')));
+  await assertFails(getDocs(collection(aliceDb, 'posts/post-2/comments')));
   await assertFails(setDoc(doc(aliceDb, 'posts/post-3/likes/alice'), {
     userId: 'alice',
   }));
