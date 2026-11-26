@@ -30,9 +30,12 @@ function eventMillis(event) {
 }
 
 function eventVersion(event) {
-  return typeof event.time === 'string' && event.time
+  const raw = typeof event.time === 'string' && event.time
     ? event.time
     : new Date(eventMillis(event)).toISOString();
+  const match = raw.match(/^(.*?)(?:\\.(\\d+))?Z$/);
+  if (!match) throw new Error('Invalid Firestore event timestamp.');
+  return `${match[1]}.${(match[2] || '').padEnd(9, '0').slice(0, 9)}Z`;
 }
 
 export const mirrorPublicProfile = onDocumentWritten(
