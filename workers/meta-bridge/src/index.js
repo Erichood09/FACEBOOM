@@ -60,6 +60,10 @@ async function authenticateModerator(request, env) {
   }
 }
 
+function isPageScopedId(value) {
+  return typeof value === 'string' && /^\\d{5,30}$/.test(value);
+}
+
 function cleanText(value) {
   return typeof value === 'string' ? value.trim().slice(0, MAX_TEXT_LENGTH) : '';
 }
@@ -252,4 +256,4 @@ export default {
   }
 };
 
-export { safeEqual, verifyWebhookSignature, authenticateModerator };
+export { safeEqual, verifyWebhookSignature, authenticateModerator, isPageScopedId };
