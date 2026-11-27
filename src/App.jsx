@@ -15,6 +15,8 @@ import { uploadToCloudinary } from './cloudinary';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  FacebookAuthProvider,
+  signInWithPopup,
   sendPasswordResetEmail,
   onAuthStateChanged,
   getIdTokenResult,
@@ -48,6 +50,7 @@ function App() {
 
   const [error, setError] = useState('');
   const [passwordResetMessage, setPasswordResetMessage] = useState('');
+  const [facebookLoading, setFacebookLoading] = useState(false);
 
   const [profile, setProfile] = useState({
     fullName: '',
@@ -528,6 +531,38 @@ function App() {
       } else {
         setError('Could not send the reset email. Please check your connection and try again.');
       }
+    }
+  }
+
+  // SIGN IN OR REGISTER WITH FACEBOOK THROUGH FIREBASE AUTHENTICATION
+  async function handleFacebookLogin() {
+    if (facebookLoading) return;
+    setError('');
+    setPasswordResetMessage('');
+    setFacebookLoading(true);
+
+    try {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      await signInWithPopup(auth, provider);
+      // The existing auth listener and profile loader complete account setup.
+    } catch (err) {
+      console.error('Facebook sign-in failed:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Facebook sign-in was cancelled before it finished.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Your browser blocked the Facebook sign-in window. Allow pop-ups for FACEBOOM and try again.');
+      } else if (err.code === 'auth/account-exists-with-different-credential') {
+        setError('An account already exists with this email. Sign in using your existing method first.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This website domain is not authorized for Firebase sign-in. Add the website domain in Firebase Authentication settings.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Facebook sign-in is not enabled in Firebase Authentication.');
+      } else {
+        setError('Facebook sign-in could not be completed. Please try again.');
+      }
+    } finally {
+      setFacebookLoading(false);
     }
   }
 
@@ -1047,6 +1082,27 @@ function App() {
               {registering ? 'Sign Up' : 'Log In'}
             </button>
           </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0', color: '#6b7280', fontSize: 13 }}>
+            <span style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+            <span>OR</span>
+            <span style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleFacebookLogin}
+            disabled={facebookLoading}
+            style={{
+              ...primaryButtonStyle,
+              width: '100%',
+              background: '#1877f2',
+              opacity: facebookLoading ? 0.7 : 1,
+              cursor: facebookLoading ? 'wait' : 'pointer'
+            }}
+          >
+            {facebookLoading ? 'Connecting to Facebook...' : 'Continue with Facebook'}
+          </button>
 
           <p style={{ marginTop: 20 }}>
             {registering
