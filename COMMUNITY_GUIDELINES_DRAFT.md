@@ -1,36 +1,43 @@
-# FACEBOOM Community Guidelines — Draft for Owner Review
+# FACEBOOM Community Guidelines
 
-**This draft must be reviewed and adopted by the FACEBOOM owner before users are required to accept it.** Add the verified publisher name, support/moderation contact and effective date before publication.
+FACEBOOM is a place to connect, share and communicate respectfully. These rules apply to profiles, posts, comments, photos, videos and messages shared through FACEBOOM. They are separate from Facebook's rules.
 
-FACEBOOM should be a place where people can connect respectfully. Users must not post, share, send or promote:
+## 1. Treat people with respect
+- No threats, targeted harassment, bullying, stalking or intimidation.
+- No hate, dehumanization or encouragement of violence against a person or group.
+- Do not organize or encourage others to abuse, threaten or target someone.
 
-- Threats, targeted harassment, bullying or intimidation.
-- Hate, dehumanization or encouragement of violence against people or groups.
-- Sexual exploitation, non-consensual intimate content, or any sexual content involving minors.
-- Content that exploits, endangers or abuses children.
-- Credible threats, instructions or encouragement for self-harm or violence.
-- Scams, impersonation, phishing, malware or deceptive schemes.
-- Spam, automated abuse or coordinated manipulation.
-- Private information shared without permission.
-- Illegal goods, services or activity.
-- Copyright-infringing content or content the user has no right to share.
+## 2. Protect children and prevent sexual exploitation
+- Never post, request, create, share or promote sexual content involving anyone under 18.
+- No child exploitation, grooming, trafficking or content that puts a child at risk.
+- No non-consensual intimate images or sexual exploitation of any person.
 
-## Reporting and blocking
+## 3. Do not encourage violence or self-harm
+- No credible threats, instructions or encouragement to hurt another person.
+- Do not encourage suicide or self-harm, or praise another person's suffering.
+- Content indicating immediate danger may be escalated through appropriate safety channels or authorities where legally required or permitted.
 
-Users should be able to report posts, profiles, comments and private messages from the relevant screen. Users should be able to block another account. Reports must be reviewed by an authorized moderation team under a documented process.
+## 4. Keep accounts and content honest
+- No scams, phishing, malware, fraudulent offers or deceptive schemes.
+- Do not impersonate another person, organization or public authority.
+- No spam, fake engagement, automated abuse or coordinated manipulation.
+- Do not share another person's private information without permission.
 
-## Enforcement
+## 5. Follow the law and respect ownership
+- Do not use FACEBOOM to buy, sell, promote or arrange illegal goods or services.
+- Only upload content you created or have permission to share.
+- Do not knowingly infringe copyright, trademarks or other people's rights.
 
-Depending on severity and history, FACEBOOM may remove content, restrict features, suspend accounts or permanently disable accounts. Credible threats and suspected child-safety issues require an escalation process consistent with applicable law.
+## 6. Reporting and blocking
+Use the in-app report controls on relevant content or accounts where available. Use blocking to limit unwanted interactions. Reports are reviewed by authorized FACEBOOM moderators; a report is not an automatic finding that a rule was broken.
 
-## Appeals and support
+## 7. Moderation and enforcement
+Depending on seriousness, evidence and relevant history, FACEBOOM may remove content, issue a warning, restrict features, temporarily suspend an account or permanently disable an account. Serious violations may result in action without a prior warning. FACEBOOM moderators make decisions under FACEBOOM's own rules; Facebook does not automatically decide a member's FACEBOOM account status.
 
-[Add a real appeal process, moderation contact email, expected response targets and emergency reporting guidance.]
+## 8. Appeals
+Use the appeal form on the account restriction screen where available, or email **faceboom.support@gmail.com** with the subject **FACEBOOM Moderation Appeal**. Include your FACEBOOM username, the date of the action and why you believe it should be reviewed. Never send your password or verification codes. An authorized moderator will review the appeal where possible; a decision may be upheld, changed or reversed.
 
-## Owner decisions required
+## 9. Safety and contact
+For questions, safety reports that cannot be submitted in the app, or moderation appeals, contact **faceboom.support@gmail.com**. Email is not an emergency channel. If someone is in immediate danger, contact local emergency services.
 
-- Confirm prohibited-content rules and age policy.
-- Name the moderation owner/team and provide a monitored email address.
-- Set realistic response and escalation procedures.
-- Define appeal handling and record retention.
-- Ensure the in-app report/block features and moderator tools actually exist before claiming they are available.
+FACEBOOM may update these rules as the service and applicable requirements change.
