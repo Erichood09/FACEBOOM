@@ -21,8 +21,7 @@ export default function CommunityGuidelines({ onBack }) {
       </div>
 
       <section style={sectionStyle}>
-        <p style={{ marginTop: 0 }}><strong>Our goal:</strong> FACEBOOM is a place to connect, share and communicate respectfully. These rules apply to profiles, posts, comments, photos, videos and messages shared through FACEBOOM.</p>
-        <p style={{ marginBottom: 0, color: '#5f6368', fontSize: 13 }}>This page explains FACEBOOM's safety rules. The service owner must publish a monitored support contact and formally confirm the policy before representing it as a complete legal policy.</p>
+        <p style={{ marginTop: 0 }}><strong>Our goal:</strong> FACEBOOM is a place to connect, share and communicate respectfully. These rules apply to profiles, posts, comments, photos, videos and messages shared through FACEBOOM. They are separate from Facebook's rules.</p>
       </section>
 
       <section style={sectionStyle}>
@@ -92,13 +91,15 @@ export default function CommunityGuidelines({ onBack }) {
 
       <section style={sectionStyle}>
         <h2 style={headingStyle}>8. Appeals</h2>
-        <p>If your account is suspended or disabled, use the appeal form shown on the account restriction screen, where available. Explain why you believe the decision should be reviewed and provide relevant information. An appeal will be considered by the moderation team; submitting one does not guarantee that the decision will be changed.</p>
+        <p>If your account is suspended or disabled, use the appeal form shown on the account restriction screen, where available. You may also email <a href="mailto:faceboom.support@gmail.com?subject=FACEBOOM%20Moderation%20Appeal">faceboom.support@gmail.com</a> with the subject <strong>FACEBOOM Moderation Appeal</strong>. Include your FACEBOOM username, the date of the action and why you believe it should be reviewed. Never send your password or verification codes.</p>
+        <p>An appeal will be considered by an authorized moderator where possible. The decision may be upheld, changed or reversed; submitting an appeal does not guarantee a change.</p>
       </section>
 
       <section style={sectionStyle}>
         <h2 style={headingStyle}>9. Safety and updates</h2>
-        <p>These rules may be updated as FACEBOOM develops. Serious or immediate danger should be reported to local emergency services; FACEBOOM is not an emergency-response service.</p>
-        <p style={{ marginBottom: 0, color: '#5f6368', fontSize: 13 }}>A public moderation/support email, policy effective date, minimum-age rule and appeal response targets still need to be confirmed by the service owner before final adoption.</p>
+        <p>These rules may be updated as FACEBOOM develops. Serious or immediate danger should be reported to local emergency services; FACEBOOM is not an emergency-response service and email is not monitored for emergencies.</p>
+        <p>For questions, safety reports that cannot be submitted in the app, or moderation appeals, contact <a href="mailto:faceboom.support@gmail.com">faceboom.support@gmail.com</a>. Do not send passwords, sign-in codes or payment details.</p>
+        <p style={{ marginBottom: 0, color: '#5f6368', fontSize: 13 }}>FACEBOOM may update these rules as the service and applicable requirements change.</p>
       </section>
     </main>
   );
