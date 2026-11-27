@@ -1392,7 +1392,9 @@ function App() {
       <main style={mainStyle}>
         {showGuidelines ? (
           <CommunityGuidelines onBack={() => setShowGuidelines(false)} />
-        ) : warningNotice && (
+        ) : (
+          <>
+        {warningNotice && (
           <div role="status" style={{ ...cardStyle, borderLeft: '4px solid #d97706', marginBottom: 14 }}>
             <strong>Community guidelines warning</strong>
             <p style={{ marginBottom: 0 }}>{warningNotice}</p>
@@ -1954,6 +1956,8 @@ function App() {
                 </div>
               );
             })}
+          </>
+        )}
           </>
         )}
       </main>
