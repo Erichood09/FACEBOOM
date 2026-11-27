@@ -25,6 +25,11 @@ export default function CommunityGuidelines({ onBack }) {
       </section>
 
       <section style={sectionStyle}>
+        <h2 style={headingStyle}>Who can use FACEBOOM</h2>
+        <p style={{ marginBottom: 0 }}>You must be at least 13 years old to create or use a FACEBOOM account. If the law where you live requires you to be older to use an online service like FACEBOOM, that higher minimum age applies. Do not create an account if you do not meet the age requirement.</p>
+      </section>
+
+      <section style={sectionStyle}>
         <h2 style={headingStyle}>1. Treat people with respect</h2>
         <ul style={listStyle}>
           <li>No threats, targeted harassment, bullying, stalking or intimidation.</li>
