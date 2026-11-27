@@ -3,6 +3,7 @@ import './App.css';
 import FriendsPanel from './FriendsPanel';
 import MessagesPanel from './MessagesPanel';
 import SafetyActions from './SafetyActions';
+import CommunityGuidelines from './CommunityGuidelines';
 import ShareActions from './ShareActions';
 import ModeratorPanel from './ModeratorPanel';
 import LivePanel from './LivePanel';
@@ -74,6 +75,7 @@ function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showGuidelines, setShowGuidelines] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [showModerator, setShowModerator] = useState(false);
@@ -1042,6 +1044,11 @@ function App() {
     );
   }
 
+  // Public Community Guidelines page is available before and after sign-in.
+  if (!user && showGuidelines) {
+    return <CommunityGuidelines onBack={() => setShowGuidelines(false)} />;
+  }
+
   // LOGIN AND REGISTRATION
   if (!user) {
     return (
@@ -1050,6 +1057,10 @@ function App() {
           <h1 style={{ color: '#1877f2' }}>FACEBOOM</h1>
 
           <p>Connect with friends and the world around you.</p>
+
+          <button type="button" style={switchButtonStyle} onClick={() => setShowGuidelines(true)}>
+            Read FACEBOOM Community Guidelines
+          </button>
 
           {new URLSearchParams(window.location.search).get('invite') && (
             <p style={{ background: '#eef5ff', borderRadius: 8, padding: 12, color: '#174ea6' }}>
@@ -1213,6 +1224,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1229,6 +1241,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(true);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1247,6 +1260,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1263,6 +1277,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1280,6 +1295,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1297,6 +1313,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1313,6 +1330,7 @@ function App() {
           <button
             style={headerButtonStyle}
             onClick={() => {
+              setShowGuidelines(false);
               setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
@@ -1326,11 +1344,29 @@ function App() {
             🔴 Live
           </button>
 
+          <button
+            style={headerButtonStyle}
+            onClick={() => {
+              setShowGuidelines(true);
+              setShowProfile(false);
+              setShowNotifications(false);
+              setShowWallet(false);
+              setShowFriends(false);
+              setShowMessages(false);
+              setShowModerator(false);
+              setShowLive(false);
+              setEditingProfile(false);
+            }}
+          >
+            Community Guidelines
+          </button>
+
           {isModerator && (
             <button
               style={headerButtonStyle}
               onClick={() => {
-                setShowProfile(false);
+                setShowGuidelines(false);
+              setShowProfile(false);
               setShowNotifications(false);
               setShowWallet(false);
                 setShowFriends(false);
@@ -1354,7 +1390,9 @@ function App() {
       </header>
 
       <main style={mainStyle}>
-        {warningNotice && (
+        {showGuidelines ? (
+          <CommunityGuidelines onBack={() => setShowGuidelines(false)} />
+        ) : warningNotice && (
           <div role="status" style={{ ...cardStyle, borderLeft: '4px solid #d97706', marginBottom: 14 }}>
             <strong>Community guidelines warning</strong>
             <p style={{ marginBottom: 0 }}>{warningNotice}</p>
