@@ -17,6 +17,7 @@ import {
   signInWithEmailAndPassword,
   FacebookAuthProvider,
   signInWithPopup,
+  linkWithPopup,
   sendPasswordResetEmail,
   onAuthStateChanged,
   getIdTokenResult,
@@ -51,6 +52,9 @@ function App() {
   const [error, setError] = useState('');
   const [passwordResetMessage, setPasswordResetMessage] = useState('');
   const [facebookLoading, setFacebookLoading] = useState(false);
+  const [facebookLinking, setFacebookLinking] = useState(false);
+  const [facebookLinkMessage, setFacebookLinkMessage] = useState('');
+  const [facebookLinkError, setFacebookLinkError] = useState('');
 
   const [profile, setProfile] = useState({
     fullName: '',
@@ -563,6 +567,36 @@ function App() {
       }
     } finally {
       setFacebookLoading(false);
+    }
+  }
+
+  // LINK FACEBOOK TO THE CURRENT FACEBOOM ACCOUNT WITHOUT CREATING A SECOND ACCOUNT
+  async function handleLinkFacebook() {
+    if (!user || facebookLinking) return;
+    setFacebookLinkError('');
+    setFacebookLinkMessage('');
+    setFacebookLinking(true);
+    try {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      const result = await linkWithPopup(user, provider);
+      setUser(result.user);
+      setFacebookLinkMessage('Your Facebook account is now connected to this FACEBOOM account. You can use either login method.');
+    } catch (err) {
+      console.error('Facebook account linking failed:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setFacebookLinkError('Facebook connection was cancelled before it finished.');
+      } else if (err.code === 'auth/credential-already-in-use' || err.code === 'auth/email-already-in-use') {
+        setFacebookLinkError('This Facebook account is already connected to another FACEBOOM account. Contact support before trying to combine accounts.');
+      } else if (err.code === 'auth/provider-already-linked') {
+        setFacebookLinkMessage('A Facebook account is already connected to this FACEBOOM account.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setFacebookLinkError('Your browser blocked the Facebook window. Allow pop-ups for FACEBOOM and try again.');
+      } else {
+        setFacebookLinkError('Could not connect Facebook. Please try again.');
+      }
+    } finally {
+      setFacebookLinking(false);
     }
   }
 
@@ -1394,6 +1428,27 @@ function App() {
         ) : showProfile ? (
           <div style={cardStyle}>
             <h2 style={{ color: '#1877f2' }}>My Profile</h2>
+
+            <div style={{ margin: '14px 0', padding: 12, background: '#f7f8fa', borderRadius: 8, textAlign: 'left' }}>
+              <strong>Facebook login</strong>
+              {user.providerData.some((item) => item.providerId === 'facebook.com') ? (
+                <p style={{ color: '#188038', marginTop: 6 }}>Your Facebook account is connected to this FACEBOOM account.</p>
+              ) : (
+                <>
+                  <p style={{ color: '#687684', margin: '6px 0' }}>Connect your Facebook account so you can use Facebook or your existing FACEBOOM login to access this same account.</p>
+                  <button
+                    type="button"
+                    onClick={handleLinkFacebook}
+                    disabled={facebookLinking}
+                    style={{ ...primaryButtonStyle, marginTop: 4, opacity: facebookLinking ? 0.7 : 1 }}
+                  >
+                    {facebookLinking ? 'Connecting Facebook...' : 'Connect Facebook to this account'}
+                  </button>
+                </>
+              )}
+              {facebookLinkMessage && <p style={{ color: '#188038', marginTop: 8 }}>{facebookLinkMessage}</p>}
+              {facebookLinkError && <p style={errorStyle}>{facebookLinkError}</p>}
+            </div>
 
             {profileLoading ? (
               <p>Loading your profile...</p>
