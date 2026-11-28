@@ -245,6 +245,16 @@ export default function FriendsPanel({ user, profile, onBack }) {
       const theirFriendData = publicProfile(myProfile, user.uid);
 
       batch.update(requestRef, { status: 'accepted', respondedAt: serverTimestamp() });
+      batch.set(doc(collection(db, 'users', request.fromUid, 'notifications')), {
+        type: 'friend_accept',
+        actorUid: user.uid,
+        recipientUid: request.fromUid,
+        actorName: profile.fullName || 'FACEBOOM Member',
+        actorUsername: profile.username || '',
+        requestId: request.id,
+        createdAt: serverTimestamp(),
+        readAt: null
+      });
       batch.set(myFriendRef, { ...otherProfile, uid: request.fromUid, friendSince: serverTimestamp() });
       batch.set(theirFriendRef, { ...theirFriendData, uid: user.uid, friendSince: serverTimestamp() });
       batch.set(doc(db, 'publicProfiles', user.uid), myFriendData, { merge: true });
