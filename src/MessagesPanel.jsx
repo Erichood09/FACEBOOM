@@ -221,6 +221,17 @@ export default function MessagesPanel({ user, profile, onBack }) {
         senderName: profile.fullName || user.email || 'FACEBOOM Member',
         createdAt: serverTimestamp()
       });
+      batch.set(doc(collection(db, 'users', otherUid, 'notifications')), {
+        type: 'message',
+        actorUid: user.uid,
+        recipientUid: otherUid,
+        actorName: profile.fullName || 'FACEBOOM Member',
+        actorUsername: profile.username || '',
+        conversationId,
+        messageId: messageRef.id,
+        createdAt: serverTimestamp(),
+        readAt: null
+      });
 
       const summary = {
         conversationId,
