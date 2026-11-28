@@ -81,6 +81,7 @@ function App() {
   const [showModerator, setShowModerator] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [showWallet, setShowWallet] = useState(() => new URLSearchParams(window.location.search).get('wallet') === 'return');
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
@@ -277,6 +278,21 @@ function App() {
     return onSnapshot(doc(db, 'moderationAccounts', user.uid), (snapshot) => {
       setWarningNotice(snapshot.exists() ? snapshot.data().latestWarning || '' : '');
     }, (err) => console.warn('Moderation notice listener:', err));
+  }, [user]);
+
+  // Keep the unread notification badge live while the member is signed in.
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotificationCount(0);
+      return undefined;
+    }
+    const unreadQuery = query(
+      collection(db, 'users', user.uid, 'notifications'),
+      where('readAt', '==', null)
+    );
+    return onSnapshot(unreadQuery, (snapshot) => {
+      setUnreadNotificationCount(snapshot.size);
+    }, (err) => console.warn('Unread notification count:', err));
   }, [user]);
 
   // LOAD THE CURRENT MEMBER'S BLOCK LIST
@@ -790,6 +806,23 @@ function App() {
           userId: user.uid,
           createdAt: serverTimestamp()
         });
+        const likedPost = posts.find((item) => item.id === postId);
+        if (likedPost?.authorId && likedPost.authorId !== user.uid) {
+          try {
+            await addDoc(collection(db, 'users', likedPost.authorId, 'notifications'), {
+              type: 'post_like',
+              actorUid: user.uid,
+              recipientUid: likedPost.authorId,
+              actorName: profile.fullName || 'FACEBOOM Member',
+              actorUsername: profile.username || '',
+              postId,
+              createdAt: serverTimestamp(),
+              readAt: null
+            });
+          } catch (notificationError) {
+            console.warn('Like notification could not be created:', notificationError);
+          }
+        }
       }
 
     } catch (err) {
@@ -833,7 +866,26 @@ function App() {
           text: commentText,
           createdAt: serverTimestamp()
         }
-      );
+      ).then(async (commentRef) => {
+        const commentedPost = posts.find((item) => item.id === postId);
+        if (commentedPost?.authorId && commentedPost.authorId !== user.uid) {
+          try {
+            await addDoc(collection(db, 'users', commentedPost.authorId, 'notifications'), {
+              type: 'post_comment',
+              actorUid: user.uid,
+              recipientUid: commentedPost.authorId,
+              actorName: profile.fullName || 'FACEBOOM Member',
+              actorUsername: profile.username || '',
+              postId,
+              commentId: commentRef.id,
+              createdAt: serverTimestamp(),
+              readAt: null
+            });
+          } catch (notificationError) {
+            console.warn('Comment notification could not be created:', notificationError);
+          }
+        }
+      });
 
       setCommentInputs((previous) => ({
         ...previous,
@@ -1289,7 +1341,7 @@ function App() {
               setEditingProfile(false);
             }}
           >
-            Notifications
+            Notifications {unreadNotificationCount > 0 ? `(${unreadNotificationCount})` : ''}
           </button>
 
           <button
