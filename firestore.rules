@@ -179,8 +179,6 @@ service cloud.firestore {
         allow create: if activeMember()
           && request.auth.uid == request.resource.data.actorUid
           && request.resource.data.recipientUid == userId
-          && request.resource.data.type == 'friend_request'
-          && request.resource.data.requestId == request.resource.data.actorUid + '_' + userId
           && request.resource.data.actorName is string
           && request.resource.data.actorName.size() <= 120
           && request.resource.data.actorUsername is string
@@ -188,13 +186,46 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && request.resource.data.readAt == null
           && request.resource.data.keys().hasOnly([
-            'type', 'actorUid', 'recipientUid', 'requestId',
-            'actorName', 'actorUsername', 'createdAt', 'readAt'
+            'type', 'actorUid', 'recipientUid', 'requestId', 'postId',
+            'commentId', 'conversationId', 'messageId', 'actorName',
+            'actorUsername', 'createdAt', 'readAt'
           ])
-          && existsAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId))
-          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == request.auth.uid
-          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == userId
-          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'pending';
+          && (
+            (request.resource.data.type == 'friend_request'
+              && request.resource.data.requestId == request.resource.data.actorUid + '_' + userId
+              && existsAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId))
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == request.auth.uid
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == userId
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'pending')
+            ||
+            (request.resource.data.type == 'friend_accept'
+              && request.resource.data.requestId == userId + '_' + request.resource.data.actorUid
+              && existsAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId))
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == userId
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == request.auth.uid
+              && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'accepted')
+            ||
+            (request.resource.data.type == 'post_like'
+              && request.resource.data.postId is string
+              && get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.authorId == userId
+              && existsAfter(/databases/$(database)/documents/posts/$(request.resource.data.postId)/likes/$(request.auth.uid))
+              && getAfter(/databases/$(database)/documents/posts/$(request.resource.data.postId)/likes/$(request.auth.uid)).data.userId == request.auth.uid)
+            ||
+            (request.resource.data.type == 'post_comment'
+              && request.resource.data.postId is string
+              && request.resource.data.commentId is string
+              && get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.authorId == userId
+              && existsAfter(/databases/$(database)/documents/posts/$(request.resource.data.postId)/comments/$(request.resource.data.commentId))
+              && getAfter(/databases/$(database)/documents/posts/$(request.resource.data.postId)/comments/$(request.resource.data.commentId)).data.authorId == request.auth.uid)
+            ||
+            (request.resource.data.type == 'message'
+              && request.resource.data.conversationId is string
+              && request.resource.data.messageId is string
+              && existsAfter(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId))
+              && getAfter(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants.hasAll([request.auth.uid, userId])
+              && existsAfter(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)/messages/$(request.resource.data.messageId))
+              && getAfter(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)/messages/$(request.resource.data.messageId)).data.senderId == request.auth.uid)
+          );
 
         allow update: if ownsUser(userId) && activeMember()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
