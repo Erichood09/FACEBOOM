@@ -402,10 +402,29 @@ export default function FriendsPanel({ user, profile, onBack }) {
         <button className={activeTab === 'blocked' ? 'active' : ''} onClick={() => setActiveTab('blocked')}>
           Blocked ({blockedUserIds.length})
         </button>
+        <button className={activeTab === 'invite' ? 'active' : ''} onClick={() => setActiveTab('invite')}>
+          Invite Friends
+        </button>
       </div>
 
       {message && <p className="fb-status-message">{message}</p>}
       {error && <p className="fb-error-message">{error}</p>}
+
+      {activeTab === 'invite' && (
+        <div className="fb-people-list">
+          <h3>Invite people to FACEBOOM</h3>
+          <p className="fb-empty-state">
+            Share your personal invitation link with friends on Facebook, WhatsApp, Telegram,
+            or any other app. When someone opens the link, FACEBOOM will show them the
+            invitation and take them to account registration.
+          </p>
+          <ShareActions
+            title="Join me on FACEBOOM"
+            text={`Join me on FACEBOOM and connect with friends. Sign up using my invitation link.`}
+            url={`${window.location.origin}${window.location.pathname}?invite=${user.uid}`}
+          />
+        </div>
+      )}
 
       {activeTab === 'discover' && (
         <>
