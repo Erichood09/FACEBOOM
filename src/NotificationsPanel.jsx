@@ -68,7 +68,13 @@ export default function NotificationsPanel({ user, onBack }) {
           {notifications.map((item) => (
             <article key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: item.readAt ? '#fff' : '#eef5ff' }}>
               <strong>{item.actorName || 'A FACEBOOM member'}</strong>
-              <p style={{ margin: '6px 0' }}>{item.type === 'friend_request' ? 'sent you a friend request.' : 'sent you a notification.'}</p>
+              <p style={{ margin: '6px 0' }}>{({
+                friend_request: 'sent you a friend request.',
+                friend_accepted: 'accepted your friend request.',
+                post_like: 'liked your post.',
+                post_comment: 'commented on your post.',
+                new_message: 'sent you a private message.'
+              })[item.type] || 'sent you a notification.'}</p>
               {!item.readAt && (
                 <button type="button" onClick={() => markRead(item)} disabled={busyId === item.id} style={{ border: 0, background: 'transparent', color: '#1877f2', padding: 0, cursor: 'pointer' }}>
                   {busyId === item.id ? 'Updating...' : 'Mark as read'}

@@ -31,6 +31,7 @@ import {
   getDoc,
   collection,
   addDoc,
+  writeBatch,
   query,
   orderBy,
   onSnapshot,
@@ -81,6 +82,7 @@ function App() {
   const [showModerator, setShowModerator] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [showWallet, setShowWallet] = useState(() => new URLSearchParams(window.location.search).get('wallet') === 'return');
   const [isModerator, setIsModerator] = useState(false);
   const [accountRestriction, setAccountRestriction] = useState(null);
@@ -277,6 +279,17 @@ function App() {
     return onSnapshot(doc(db, 'moderationAccounts', user.uid), (snapshot) => {
       setWarningNotice(snapshot.exists() ? snapshot.data().latestWarning || '' : '');
     }, (err) => console.warn('Moderation notice listener:', err));
+  }, [user]);
+
+  // Keep the notification badge synchronized with the member's unread alerts.
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotificationCount(0);
+      return undefined;
+    }
+    return onSnapshot(collection(db, 'users', user.uid, 'notifications'), (snapshot) => {
+      setUnreadNotificationCount(snapshot.docs.filter((item) => !item.data().readAt).length);
+    }, (err) => console.warn('Notification badge listener:', err));
   }, [user]);
 
   // LOAD THE CURRENT MEMBER'S BLOCK LIST
@@ -770,83 +783,88 @@ function App() {
     }
   }
 
-  // LIKE OR UNLIKE A POST
+  // LIKE OR UNLIKE A POST, notifying the post owner when someone else likes it.
   async function likePost(postId) {
     try {
-      const likeRef = doc(
-        db,
-        'posts',
-        postId,
-        'likes',
-        user.uid
-      );
-
+      const likeRef = doc(db, 'posts', postId, 'likes', user.uid);
       const existingLike = await getDoc(likeRef);
-
       if (existingLike.exists()) {
         await deleteDoc(likeRef);
-      } else {
-        await setDoc(likeRef, {
-          userId: user.uid,
-          createdAt: serverTimestamp()
-        });
+        return;
       }
 
+      const postSnapshot = await getDoc(doc(db, 'posts', postId));
+      if (!postSnapshot.exists()) throw new Error('This post is no longer available.');
+      const postData = postSnapshot.data();
+      const batch = writeBatch(db);
+      batch.set(likeRef, { userId: user.uid, createdAt: serverTimestamp() });
+
+      if (postData.authorId && postData.authorId !== user.uid) {
+        const notificationRef = doc(collection(db, 'users', postData.authorId, 'notifications'));
+        batch.set(notificationRef, {
+          type: 'post_like',
+          actorUid: user.uid,
+          recipientUid: postData.authorId,
+          actorName: profile.fullName || user.email || 'FACEBOOM Member',
+          actorUsername: profile.username || '',
+          postId,
+          createdAt: serverTimestamp(),
+          readAt: null
+        });
+      }
+      await batch.commit();
     } catch (err) {
       console.error('Like error:', err);
       setFeedError('Unable to update your like. Please try again.');
     }
   }
 
-  // ADD COMMENT
+  // ADD COMMENT and notify the owner of the post.
   async function addComment(postId) {
     const commentText = (commentInputs[postId] || '').trim();
-
     if (!commentText) {
-      setCommentErrors((previous) => ({
-        ...previous,
-        [postId]: 'Please write a comment first.'
-      }));
+      setCommentErrors((previous) => ({ ...previous, [postId]: 'Please write a comment first.' }));
       return;
     }
-
     if (commentText.length > 2000) {
-      setCommentErrors((previous) => ({
-        ...previous,
-        [postId]: 'Your comment cannot exceed 2,000 characters.'
-      }));
+      setCommentErrors((previous) => ({ ...previous, [postId]: 'Your comment cannot exceed 2,000 characters.' }));
       return;
     }
-
-    setCommentErrors((previous) => ({
-      ...previous,
-      [postId]: ''
-    }));
+    setCommentErrors((previous) => ({ ...previous, [postId]: '' }));
 
     try {
-      await addDoc(
-        collection(db, 'posts', postId, 'comments'),
-        {
-          authorId: user.uid,
-          authorName: profile.fullName || user.email,
-          authorUsername: profile.username || '',
-          text: commentText,
-          createdAt: serverTimestamp()
-        }
-      );
+      const postSnapshot = await getDoc(doc(db, 'posts', postId));
+      if (!postSnapshot.exists()) throw new Error('This post is no longer available.');
+      const postData = postSnapshot.data();
+      const batch = writeBatch(db);
+      const commentRef = doc(collection(db, 'posts', postId, 'comments'));
+      batch.set(commentRef, {
+        authorId: user.uid,
+        authorName: profile.fullName || user.email,
+        authorUsername: profile.username || '',
+        text: commentText,
+        createdAt: serverTimestamp()
+      });
 
-      setCommentInputs((previous) => ({
-        ...previous,
-        [postId]: ''
-      }));
-
+      if (postData.authorId && postData.authorId !== user.uid) {
+        const notificationRef = doc(collection(db, 'users', postData.authorId, 'notifications'));
+        batch.set(notificationRef, {
+          type: 'post_comment',
+          actorUid: user.uid,
+          recipientUid: postData.authorId,
+          actorName: profile.fullName || user.email || 'FACEBOOM Member',
+          actorUsername: profile.username || '',
+          postId,
+          commentId: commentRef.id,
+          createdAt: serverTimestamp(),
+          readAt: null
+        });
+      }
+      await batch.commit();
+      setCommentInputs((previous) => ({ ...previous, [postId]: '' }));
     } catch (err) {
       console.error('Comment error:', err);
-
-      setCommentErrors((previous) => ({
-        ...previous,
-        [postId]: 'Unable to publish your comment. Please try again.'
-      }));
+      setCommentErrors((previous) => ({ ...previous, [postId]: 'Unable to publish your comment. Please try again.' }));
     }
   }
 
@@ -1289,7 +1307,7 @@ function App() {
               setEditingProfile(false);
             }}
           >
-            Notifications
+            Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount})` : ''}
           </button>
 
           <button

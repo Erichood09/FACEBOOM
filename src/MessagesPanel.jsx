@@ -237,6 +237,18 @@ export default function MessagesPanel({ user, profile, onBack }) {
         ...summary,
         otherUid: user.uid
       });
+      const notificationRef = doc(collection(db, 'users', otherUid, 'notifications'));
+      batch.set(notificationRef, {
+        type: 'new_message',
+        actorUid: user.uid,
+        recipientUid: otherUid,
+        actorName: profile.fullName || user.email || 'FACEBOOM Member',
+        actorUsername: profile.username || '',
+        conversationId,
+        messageId: messageRef.id,
+        createdAt: serverTimestamp(),
+        readAt: null
+      });
 
       await batch.commit();
       setDraft('');
